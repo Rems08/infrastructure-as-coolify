@@ -30,24 +30,55 @@ func PeekKind(path string) (string, error) {
 // resolves ${env:VAR} interpolation in visible env-var values.
 func LoadApplication(path string) (resource.Application, error) {
 	var app resource.Application
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return app, fmt.Errorf("read %s: %w", path, err)
+	if err := loadStrict(path, &app); err != nil {
+		return app, err
 	}
-	if err := yaml.UnmarshalWithOptions(data, &app, yaml.Strict()); err != nil {
-		return app, fmt.Errorf("parse %s: %w", path, err)
-	}
-	if err := interpolateEnvVars(&app); err != nil {
+	if err := interpolateEntries(app.Spec.EnvVars); err != nil {
 		return app, fmt.Errorf("%s: %w", path, err)
 	}
 	return app, nil
 }
 
-// interpolateEnvVars resolves ${env:VAR} in each visible env-var value. Secret values
+// LoadDatabase parses a YAML file into a Database with strict decoding.
+func LoadDatabase(path string) (resource.Database, error) {
+	var db resource.Database
+	if err := loadStrict(path, &db); err != nil {
+		return db, err
+	}
+	return db, nil
+}
+
+// LoadEnvVar parses a YAML file into a standalone EnvVar resource with strict decoding,
+// resolving ${env:VAR} interpolation in visible values.
+func LoadEnvVar(path string) (resource.EnvVar, error) {
+	var ev resource.EnvVar
+	if err := loadStrict(path, &ev); err != nil {
+		return ev, err
+	}
+	if err := interpolateEntries(ev.Spec.Vars); err != nil {
+		return ev, fmt.Errorf("%s: %w", path, err)
+	}
+	return ev, nil
+}
+
+// loadStrict reads path and strictly decodes it into dst (unknown/duplicate fields are
+// rejected).
+func loadStrict(path string, dst any) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", path, err)
+	}
+	if err := yaml.UnmarshalWithOptions(data, dst, yaml.Strict()); err != nil {
+		return fmt.Errorf("parse %s: %w", path, err)
+	}
+	return nil
+}
+
+// interpolateEntries resolves ${env:VAR} in each visible value. Secret values
 // (value_secret) are resolved by secrets.Secret at decode time and are skipped here.
-func interpolateEnvVars(app *resource.Application) error {
-	for i := range app.Spec.EnvVars {
-		ev := &app.Spec.EnvVars[i]
+func interpolateEntries(entries []resource.EnvVarEntry) error {
+	for i := range entries {
+		ev := &entries[i]
 		if ev.Value == "" {
 			continue
 		}

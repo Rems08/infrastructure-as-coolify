@@ -75,7 +75,13 @@
         },
         "env_vars": {
           "items": {
-            "$ref": "#/$defs/EnvVar"
+            "$ref": "#/$defs/EnvVarEntry"
+          },
+          "type": "array"
+        },
+        "env_vars_from": {
+          "items": {
+            "type": "string"
           },
           "type": "array"
         }
@@ -104,7 +110,7 @@
         "network"
       ]
     },
-    "EnvVar": {
+    "EnvVarEntry": {
       "properties": {
         "name": {
           "type": "string"

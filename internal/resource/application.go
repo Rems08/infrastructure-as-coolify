@@ -23,7 +23,7 @@ const KindApplication = "Application"
 
 // buildPacks is the user-facing IaC enum. It intentionally differs from the upstream
 // Coolify enum (see internal/coolify G-W1-build_pack-enum-mismatch); the IaC→API
-// mapping is Wave 2 work.
+// mapping lands with `apply` in Wave 3.
 var buildPacks = map[string]bool{
 	"dockerfile":     true,
 	"dockerimage":    true,
@@ -56,7 +56,8 @@ type ApplicationSpec struct {
 	HealthCheck *HealthCheckSpec `yaml:"health_check,omitempty" json:"health_check,omitempty" iac:"doc=HTTP health check configuration"`
 	Limits      *LimitsSpec      `yaml:"limits,omitempty" json:"limits,omitempty" iac:"doc=CPU and memory limits"`
 	Preview     *PreviewSpec     `yaml:"preview,omitempty" json:"preview,omitempty" iac:"doc=Pull-request preview configuration"`
-	EnvVars     []EnvVar         `yaml:"env_vars,omitempty" json:"env_vars,omitempty" iac:"doc=Environment variables"`
+	EnvVars     []EnvVarEntry    `yaml:"env_vars,omitempty" json:"env_vars,omitempty" iac:"doc=Inline environment variables"`
+	EnvVarsFrom []string         `yaml:"env_vars_from,omitempty" json:"env_vars_from,omitempty" iac:"doc=Names of EnvVar resources whose variables are merged into this application"`
 }
 
 // ImageSpec identifies a Docker image.
@@ -88,17 +89,18 @@ type PreviewSpec struct {
 	URLTemplate string `yaml:"url_template,omitempty" json:"url_template,omitempty" iac:"doc=Preview URL template such as {{pr_id}}.{{domain}}"`
 }
 
-// EnvVar models a Coolify env var. Exactly one of Value / ValueSecret must be set
-// (cf. secrets-policy.md §3.2): the YAML field chosen determines whether the value is
-// visible (`value`) or REDACTED (`value_secret`).
-type EnvVar struct {
+// EnvVarEntry models a single Coolify env var. Exactly one of Value / ValueSecret must
+// be set (cf. secrets-policy.md §3.2): the YAML field chosen determines whether the value
+// is visible (`value`) or REDACTED (`value_secret`). It is shared by an Application's
+// inline `env_vars` and by the standalone EnvVar resource (see envvar.go).
+type EnvVarEntry struct {
 	Name        string         `yaml:"name" json:"name" iac:"doc=Variable name,required"`
 	Value       string         `yaml:"value,omitempty" json:"value,omitempty" iac:"doc=Visible value (supports ${env:VAR} interpolation); use value_secret for sensitive values"`
 	ValueSecret secrets.Secret `yaml:"value_secret,omitempty" json:"value_secret,omitempty" iac:"doc=Sensitive value; MUST be ${env:NAME} or ${sops:path} and is shown as [REDACTED]"`
 }
 
 // Validate enforces ExactlyOneOf{Value, ValueSecret} (cf. secrets-policy.md §3.2).
-func (e EnvVar) Validate() error {
+func (e EnvVarEntry) Validate() error {
 	if e.Name == "" {
 		return fmt.Errorf("env_var: name is required")
 	}
@@ -158,9 +160,18 @@ func (s ApplicationSpec) validate() error {
 	if s.FQDN != "" && !strings.HasPrefix(s.FQDN, "http://") && !strings.HasPrefix(s.FQDN, "https://") {
 		return fmt.Errorf("spec.fqdn: must start with http:// or https://, got %q", s.FQDN)
 	}
+	return s.validateEnvVars()
+}
+
+func (s ApplicationSpec) validateEnvVars() error {
 	for i := range s.EnvVars {
 		if err := s.EnvVars[i].Validate(); err != nil {
 			return fmt.Errorf("spec.env_vars[%d]: %w", i, err)
+		}
+	}
+	for i, name := range s.EnvVarsFrom {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("spec.env_vars_from[%d]: name must not be empty", i)
 		}
 	}
 	return nil

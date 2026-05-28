@@ -11,51 +11,54 @@ import (
 
 const resourceDir = "../resource"
 
-// TestStructFieldsMatchMarkdownHeadings covers critère §7 #9. It re-extracts the
-// documented fields from the resource structs and asserts that 100% of them have a
-// heading in the committed docs/reference/application.md. Regenerate with
+// TestStructFieldsMatchMarkdownHeadings covers critère §7 #9. For every resource it
+// re-extracts the documented fields from the structs and asserts that 100% of them have a
+// heading in the committed docs/reference/<slug>.md. Regenerate with
 // `iac-coolify docs gen` (or `go run ./cmd/iac-coolify docs gen`) when it fails.
 func TestStructFieldsMatchMarkdownHeadings(t *testing.T) {
-	structs, err := docs.ExtractStructDocs(resourceDir)
+	resources, err := docs.ExtractResourceDocs(resourceDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(structs) == 0 {
-		t.Fatal("no documented structs found; extractor likely broken")
+	if len(resources) == 0 {
+		t.Fatal("no documented resources found; extractor likely broken")
 	}
 
-	mdPath := filepath.Join("..", "..", "docs", "reference", "application.md")
-	mdBytes, err := os.ReadFile(mdPath)
-	if err != nil {
-		t.Fatalf("read %s (run `iac-coolify docs gen`): %v", mdPath, err)
-	}
-	headings := collectHeadings(string(mdBytes))
-
-	for _, s := range structs {
-		for _, f := range s.Fields {
-			if !headings[f.YAMLName] {
-				t.Errorf("%s.%s has an iac:doc tag but no `### %s` heading in application.md",
-					s.Name, f.YAMLName, f.YAMLName)
+	for _, rd := range resources {
+		mdPath := filepath.Join("..", "..", "docs", "reference", rd.Slug+".md")
+		mdBytes, rErr := os.ReadFile(mdPath)
+		if rErr != nil {
+			t.Fatalf("read %s (run `iac-coolify docs gen`): %v", mdPath, rErr)
+		}
+		headings := collectHeadings(string(mdBytes))
+		for _, s := range rd.Structs {
+			for _, f := range s.Fields {
+				if !headings[f.YAMLName] {
+					t.Errorf("%s.%s has an iac:doc tag but no `### %s` heading in %s.md",
+						s.Name, f.YAMLName, f.YAMLName, rd.Slug)
+				}
 			}
 		}
 	}
 }
 
-// TestGeneratedDocIsUpToDate fails if the committed markdown differs from a fresh
-// render, ensuring docs never drift from the structs.
+// TestGeneratedDocIsUpToDate fails if any committed markdown differs from a fresh render,
+// ensuring docs never drift from the structs.
 func TestGeneratedDocIsUpToDate(t *testing.T) {
-	structs, err := docs.ExtractStructDocs(resourceDir)
+	resources, err := docs.ExtractResourceDocs(resourceDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := docs.RenderMarkdown(structs)
-	mdPath := filepath.Join("..", "..", "docs", "reference", "application.md")
-	got, err := os.ReadFile(mdPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != want {
-		t.Errorf("docs/reference/application.md is stale; run `iac-coolify docs gen`")
+	for _, rd := range resources {
+		want := docs.RenderResource(rd)
+		mdPath := filepath.Join("..", "..", "docs", "reference", rd.Slug+".md")
+		got, rErr := os.ReadFile(mdPath)
+		if rErr != nil {
+			t.Fatal(rErr)
+		}
+		if string(got) != want {
+			t.Errorf("docs/reference/%s.md is stale; run `iac-coolify docs gen`", rd.Slug)
+		}
 	}
 }
 

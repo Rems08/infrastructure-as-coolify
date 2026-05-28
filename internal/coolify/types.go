@@ -7,7 +7,8 @@ package coolify
 // NOTE: build_pack here reflects the upstream OpenAPI enum
 // (nixpacks|railpack|static|dockerfile|dockercompose) and is intentionally a plain
 // string for forward-compat. The user-facing IaC enum lives in internal/resource and
-// differs (see G-W1-build_pack-enum-mismatch); the IaC→API mapping arrives in Wave 2.
+// differs (see G-W1-build_pack-enum-mismatch); the IaC→API mapping arrives with `apply`
+// in Wave 3.
 type Application struct {
 	UUID                    string `json:"uuid"`
 	Name                    string `json:"name"`

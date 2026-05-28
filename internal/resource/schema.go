@@ -12,11 +12,10 @@ import (
 // the type has no exported fields (its value is opaque by design).
 var secretType = reflect.TypeOf(secrets.Secret{})
 
-// ApplicationSchema returns the JSON Schema for an Application, derived from the
-// struct tags (single source of truth). secrets.Secret is rendered as a constrained
-// string (${env:NAME} or ${sops:path}) rather than its opaque Go shape.
-func ApplicationSchema() *jsonschema.Schema {
-	r := &jsonschema.Reflector{
+// newReflector returns a jsonschema reflector that renders secrets.Secret as a
+// constrained string (${env:NAME} or ${sops:path}) rather than its opaque Go shape.
+func newReflector() *jsonschema.Reflector {
+	return &jsonschema.Reflector{
 		Mapper: func(t reflect.Type) *jsonschema.Schema {
 			if t == secretType {
 				return &jsonschema.Schema{
@@ -28,5 +27,24 @@ func ApplicationSchema() *jsonschema.Schema {
 			return nil
 		},
 	}
-	return r.Reflect(&Application{})
+}
+
+// ApplicationSchema returns the JSON Schema for an Application, derived from the struct
+// tags (single source of truth).
+func ApplicationSchema() *jsonschema.Schema { return newReflector().Reflect(&Application{}) }
+
+// DatabaseSchema returns the JSON Schema for a Database resource.
+func DatabaseSchema() *jsonschema.Schema { return newReflector().Reflect(&Database{}) }
+
+// EnvVarSchema returns the JSON Schema for a standalone EnvVar resource.
+func EnvVarSchema() *jsonschema.Schema { return newReflector().Reflect(&EnvVar{}) }
+
+// Schemas maps each resource slug (matching its source file and generated docs) to its
+// JSON Schema, so docs generation can emit one schema per resource.
+func Schemas() map[string]*jsonschema.Schema {
+	return map[string]*jsonschema.Schema{
+		"application": ApplicationSchema(),
+		"database":    DatabaseSchema(),
+		"envvar":      EnvVarSchema(),
+	}
 }

@@ -99,7 +99,12 @@ Pull-request preview configuration.
 
 ### env_vars
 
-Environment variables.
+Inline environment variables.
+
+
+### env_vars_from
+
+Names of EnvVar resources whose variables are merged into this application.
 
 
 ## ImageSpec
@@ -161,7 +166,7 @@ Memory limit such as 512m.
 Preview URL template such as {{pr_id}}.{{domain}}.
 
 
-## EnvVar
+## EnvVarEntry
 
 ### name
 

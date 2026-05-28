@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Rems08/infrastructure-as-coolify/internal/resource/env-var",
+  "$ref": "#/$defs/EnvVar",
+  "$defs": {
+    "EnvVar": {
+      "properties": {
+        "api_version": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/EnvVarMeta"
+        },
+        "spec": {
+          "$ref": "#/$defs/EnvVarSpec"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "api_version",
+        "kind",
+        "metadata",
+        "spec"
+      ]
+    },
+    "EnvVarEntry": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "value_secret": {
+          "type": "string",
+          "pattern": "^\\$\\{(env|sops):[^}]+\\}$"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "EnvVarMeta": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "project",
+        "environment"
+      ]
+    },
+    "EnvVarSpec": {
+      "properties": {
+        "vars": {
+          "items": {
+            "$ref": "#/$defs/EnvVarEntry"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "vars"
+      ]
+    }
+  }
+}

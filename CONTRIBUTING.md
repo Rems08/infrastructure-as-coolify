@@ -4,7 +4,9 @@ Thanks for considering a contribution! This is an OSS Go project (Apache-2.0).
 
 ## Ground rules
 
-- **Go ≥ 1.22.** All business logic lives in `internal/`; `cmd/iac-coolify/` only parses the CLI.
+- **Go 1.22 language target, go1.23.12 toolchain** (pinned in `go.mod` + `Makefile`; see the
+  comment there for why). All business logic lives in `internal/`; `cmd/iac-coolify/` only
+  parses the CLI.
 - **`make verify` must be green before every push.** It runs `gofmt`, `go vet`,
   `golangci-lint` (strict preset), `go test -race -cover`, and `govulncheck`. Never bypass
   hooks with `--no-verify`; fix the root cause instead.

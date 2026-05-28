@@ -3,6 +3,13 @@ BIN       := dist/iac-coolify
 PKG       := ./cmd/iac-coolify
 GOPATH_BIN := $(shell $(GO) env GOPATH)/bin
 
+# Pin the toolchain so local `make verify` matches CI. go1.23.12 is the only line
+# that satisfies every ratchet at once: golangci-lint v1.61 (built with go1.23)
+# cannot read export data from go ≥ 1.24, and go1.22 is EOL — its stdlib carries
+# GO-2025-3750 which govulncheck can never clear. Overridable: `make GOTOOLCHAIN=local`.
+GOTOOLCHAIN ?= go1.23.12
+export GOTOOLCHAIN
+
 .PHONY: all build test lint fmt fmt-check vet vuln verify clean tools
 
 all: verify

@@ -10,8 +10,8 @@ import (
 	"github.com/Rems08/infrastructure-as-coolify/internal/resource"
 )
 
-// Generate writes one docs/reference/<slug>.md and one <slug>.schema.json per resource
-// declared in resourceDir, into outDir.
+// Generate writes one Markdown reference page and one JSON schema file per resource
+// declared in resourceDir, into outDir (named <slug> by resource).
 func Generate(resourceDir, outDir string) error {
 	resources, err := ExtractResourceDocs(resourceDir)
 	if err != nil {

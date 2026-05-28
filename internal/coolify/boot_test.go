@@ -27,8 +27,8 @@ func TestVerifyBootSpec_Absent(t *testing.T) {
 	}
 }
 
-// TestBootRefusedOnChecksumMismatch covers critère §7 #27: a tampered spec or a
-// stale sidecar must make boot verification fail with an explicit error.
+// TestBootRefusedOnChecksumMismatch asserts a tampered spec or a stale sidecar makes
+// boot verification fail with an explicit error.
 func TestBootRefusedOnChecksumMismatch(t *testing.T) {
 	good, err := os.ReadFile(filepath.Join(pinnedOpenAPIDir(), "coolify-v4.yaml"))
 	if err != nil {

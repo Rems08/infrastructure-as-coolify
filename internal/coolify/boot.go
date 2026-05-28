@@ -20,9 +20,9 @@ const (
 var ErrSpecAbsent = errors.New("coolify: pinned OpenAPI spec not found on disk")
 
 // VerifyBootSpec checks the pinned OpenAPI spec in openapiDir before any command trusts
-// a Coolify endpoint (C-S7.3, threat-model T-S7.3). It verifies that sha256(spec) equals
-// both the compiled-in checksum and the on-disk .sha256 sidecar, returning an explicit
-// error on any mismatch so the command refuses to boot.
+// a Coolify endpoint. It verifies that sha256(spec) equals both the compiled-in checksum
+// and the on-disk .sha256 sidecar, returning an explicit error on any mismatch so the
+// command refuses to boot.
 //
 // It returns ErrSpecAbsent when the directory or spec file is missing; this is a soft
 // signal (not a mismatch) the caller can choose to ignore.

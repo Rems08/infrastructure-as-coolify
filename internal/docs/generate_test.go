@@ -11,10 +11,10 @@ import (
 
 const resourceDir = "../resource"
 
-// TestStructFieldsMatchMarkdownHeadings covers critère §7 #9. For every resource it
-// re-extracts the documented fields from the structs and asserts that 100% of them have a
-// heading in the committed docs/reference/<slug>.md. Regenerate with
-// `iac-coolify docs gen` (or `go run ./cmd/iac-coolify docs gen`) when it fails.
+// TestStructFieldsMatchMarkdownHeadings re-extracts the documented fields from the
+// structs and asserts that 100% of them have a heading in the committed Markdown
+// reference page. Regenerate with `iac-coolify docs gen`
+// (or `go run ./cmd/iac-coolify docs gen`) when it fails.
 func TestStructFieldsMatchMarkdownHeadings(t *testing.T) {
 	resources, err := docs.ExtractResourceDocs(resourceDir)
 	if err != nil {

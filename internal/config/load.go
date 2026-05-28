@@ -26,8 +26,8 @@ func PeekKind(path string) (string, error) {
 }
 
 // LoadApplication parses a YAML file into an Application with strict decoding (unknown
-// and duplicate fields are rejected — mitigation C-S2.6, threat-model T-S2.6) and
-// resolves ${env:VAR} interpolation in visible env-var values.
+// and duplicate fields are rejected) and resolves ${env:VAR} interpolation in visible
+// env-var values.
 func LoadApplication(path string) (resource.Application, error) {
 	var app resource.Application
 	if err := loadStrict(path, &app); err != nil {

@@ -9,10 +9,10 @@ import (
 
 // FromApplication projects a desired Application config into a diffable Resource.
 //
-// Only the core fields that need no IaC→API translation are compared in this release:
-// build_pack (enum mapping) and env-var reconciliation (the /applications/{uuid}/envs
-// endpoint) land with `apply` in Wave 3. The diff engine itself already supports secret
-// fields (see diff_test.go); they are wired into the projection once envs are fetched.
+// Only the core fields that need no IaC→API translation are compared here. build_pack
+// (enum mapping) and env-var reconciliation are intentionally absent from the diff
+// projection — the diff engine itself already supports secret fields (see diff_test.go),
+// they are wired into the projection once envs are fetched by an apply command.
 func FromApplication(app resource.Application) Resource {
 	fields := []Field{
 		{Name: "fqdn", Value: Scalar(app.Spec.FQDN)},

@@ -118,8 +118,8 @@ func TestUnmarshalYAML_RejectsSOPS(t *testing.T) {
 	}
 }
 
-// TestSecretLiteralRejected covers critère §7 #13 (C-L0.3): a literal Secret is
-// rejected and the error message NEVER leaks the literal value.
+// TestSecretLiteralRejected asserts a literal Secret is rejected and the error message
+// NEVER leaks the literal value.
 func TestSecretLiteralRejected(t *testing.T) {
 	const literal = "postgres://user:pass@host/db"
 	var s Secret
@@ -135,8 +135,8 @@ func TestSecretLiteralRejected(t *testing.T) {
 	}
 }
 
-// TestAllInterfacesRedact covers critère §7 #11 (C-L0.1): String/GoString/
-// MarshalJSON/MarshalYAML/LogValue never expose the value.
+// TestAllInterfacesRedact asserts String/GoString/MarshalJSON/MarshalYAML/LogValue
+// never expose the value.
 func TestAllInterfacesRedact(t *testing.T) {
 	t.Setenv("IAC_REDACT_PROBE", "TOPSECRET-VALUE-7f3a")
 	sec, err := NewFromEnv("IAC_REDACT_PROBE")

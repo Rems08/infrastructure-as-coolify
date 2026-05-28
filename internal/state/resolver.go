@@ -97,8 +97,8 @@ func Resolve(ctx context.Context, client resolverClient) (Map, error) {
 	return m, nil
 }
 
-// Save writes the resolved map to an opt-in JSON cache at path (ADR-2, --state-cache).
-// State.MarshalJSON guarantees no Secret is ever serialised (C-L0.4 ratchet).
+// Save writes the resolved map to an opt-in JSON cache at path (used by --state-cache).
+// State.MarshalJSON guarantees no Secret is ever serialised.
 func (m Map) Save(path, openAPIHash string, at time.Time) error {
 	st := &State{
 		UUIDs:       make(map[string]string, len(m)),

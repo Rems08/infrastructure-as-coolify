@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// TestParseStrictRejectsUnknownFields covers critère §7 #17 (C-S2.6): an unknown YAML
-// field is rejected with its name (and position), not silently ignored.
+// TestParseStrictRejectsUnknownFields asserts an unknown YAML field is rejected with its
+// name (and position), not silently ignored.
 func TestParseStrictRejectsUnknownFields(t *testing.T) {
 	_, err := LoadApplication(filepath.Join("testdata", "unknown-field.yaml"))
 	if err == nil {
@@ -41,8 +41,8 @@ func TestValidateInvalidExample(t *testing.T) {
 	}
 }
 
-// TestValidateEnvVarExample covers critère §7 #25: a directory mixing an Application and
-// a standalone EnvVar validates, and the summary lists both kinds.
+// TestValidateEnvVarExample asserts a directory mixing an Application and a standalone
+// EnvVar validates, and the summary lists both kinds.
 func TestValidateEnvVarExample(t *testing.T) {
 	rep, err := Validate(filepath.Join("..", "..", "examples", "envvar"), false)
 	if err != nil {
@@ -66,7 +66,8 @@ func TestValidateEnvVarExample(t *testing.T) {
 	}
 }
 
-// TestValidateLiteralSecretRejected covers critère §7 #13 at the config layer.
+// TestValidateLiteralSecretRejected asserts a literal value_secret is rejected at the
+// config layer without leaking the literal value.
 func TestValidateLiteralSecretRejected(t *testing.T) {
 	path := filepath.Join("..", "..", "testdata", "secrets-canaris", "literal-rejected.yaml")
 	rep, err := Validate(path, false)
@@ -85,8 +86,8 @@ func TestValidateLiteralSecretRejected(t *testing.T) {
 	}
 }
 
-// TestValidateCanariesDetectsAllSix covers critère §7 #15: every known canary prefix
-// is surfaced when scanning the secrets-canaris directory under --strict.
+// TestValidateCanariesDetectsAllSix asserts every known canary prefix is surfaced when
+// scanning the secrets-canaris directory under --strict.
 func TestValidateCanariesDetectsAllSix(t *testing.T) {
 	dir := filepath.Join("..", "..", "testdata", "secrets-canaris")
 	rep, err := Validate(dir, true)

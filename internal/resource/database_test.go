@@ -29,8 +29,8 @@ spec:
 `
 }
 
-// TestDatabaseValidatesAllEightEngines covers critère §7 #24: each of the 8 Coolify v4
-// engines validates, and an unknown engine is rejected.
+// TestDatabaseValidatesAllEightEngines asserts each of the 8 Coolify v4 engines
+// validates, and an unknown engine is rejected.
 func TestDatabaseValidatesAllEightEngines(t *testing.T) {
 	engines := []string{
 		"postgresql", "mysql", "mariadb", "mongodb",

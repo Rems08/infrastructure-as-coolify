@@ -1,6 +1,6 @@
 // Package state holds the optional UUID resolver cache. By contract it NEVER stores
-// secrets: MarshalJSON refuses to serialise any value that contains a
-// secrets.Secret field (belt-and-braces ratchet C-L0.4, threat-model T-S1.3).
+// secrets: MarshalJSON refuses any field of type secrets.Secret as a belt-and-braces
+// guarantee that the cache cannot accidentally serialise a secret.
 package state
 
 import (

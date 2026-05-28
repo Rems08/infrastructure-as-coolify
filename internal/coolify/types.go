@@ -7,7 +7,8 @@ package coolify
 // NOTE: build_pack here reflects the upstream OpenAPI enum
 // (nixpacks|railpack|static|dockerfile|dockercompose) and is intentionally a plain
 // string for forward-compat. The user-facing IaC enum lives in internal/resource and
-// differs (see G-W1-build_pack-enum-mismatch); the IaC→API mapping arrives in Wave 2.
+// differs (see G-W1-build_pack-enum-mismatch); the IaC→API mapping arrives with `apply`
+// in Wave 3.
 type Application struct {
 	UUID                    string `json:"uuid"`
 	Name                    string `json:"name"`
@@ -18,4 +19,21 @@ type Application struct {
 	GitBranch               string `json:"git_branch"`
 	PortsExposes            string `json:"ports_exposes"`
 	Status                  string `json:"status"`
+	EnvironmentID           int    `json:"environment_id"`
+}
+
+// Project mirrors components.schemas.Project: the documented fields the UUID resolver
+// needs to map a logical project name to its resources.
+type Project struct {
+	ID   int    `json:"id"`
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
+}
+
+// Environment mirrors components.schemas.Environment. ProjectID links it back to a
+// Project.ID; ID links an Application/Database back to its environment.
+type Environment struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	ProjectID int    `json:"project_id"`
 }

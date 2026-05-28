@@ -27,16 +27,27 @@ SHA-256 sidecar verified at boot. A nightly CI job watches upstream `v4.x` for d
 # Validate your declarative config
 iac-coolify validate examples/minimal/
 
+# Preview the changes against live Coolify (Terraform-style diff)
+export COOLIFY_API_TOKEN=...                       # plus --coolify-url or COOLIFY_API_URL
+iac-coolify plan examples/minimal/                 # runs offline (all-new) if unconfigured
+iac-coolify plan examples/minimal/ --output=json --detailed-exitcode
+
 # Generate the reference documentation from the resource structs
 iac-coolify docs gen
 ```
+
+`plan` resolves Coolify UUIDs from your logical `metadata` names (never written to YAML),
+fetches live state, and prints a per-field diff. `--detailed-exitcode` returns `0` (no
+changes), `2` (changes pending), or `1` (error). Secret values follow a Notify-only policy:
+a change is announced (`resolved value changed, source ${env:X} unchanged`) but never shown.
+Behind a Cloudflare Access gateway, set `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET`.
 
 ## Why
 
 | | `iac-coolify` | `coollabsio/coolify-cli` | `SierraJC/terraform-provider-coolify` |
 |---|---|---|---|
 | Model | declarative YAML | imperative wrapper | declarative HCL |
-| `plan`/`apply`/`destroy` | ✅ (roadmap) | ❌ | ✅ |
+| `plan`/`apply`/`destroy` | ✅ `plan` (apply/destroy on roadmap) | ❌ | ✅ |
 | State file | stateless-first | n/a | tfstate required |
 | Native to Coolify | ✅ | ✅ | wraps Terraform |
 
@@ -48,10 +59,17 @@ Resources are described in a `coolify/` directory tree, one file per resource:
 coolify/
   coolify.yaml                                   # global config (api_url, required_coolify)
   projects/<name>.yaml
-  environments/<env>/applications/<app>.yaml
+  environments/<env>/applications/<app>.yaml     # kind: Application
+  environments/<env>/databases/<db>.yaml         # kind: Database (8 engines)
+  environments/<env>/envvars/<set>.yaml          # kind: EnvVar (shared, referenced via env_vars_from)
 ```
 
-See [`examples/`](examples/) and the generated [`docs/reference/`](docs/reference/).
+Supported resource kinds: **Application**, **Database** (`postgresql`, `mysql`, `mariadb`,
+`mongodb`, `redis`, `keydb`, `dragonfly`, `clickhouse`), and standalone **EnvVar** sets that
+an Application merges in by name (`env_vars_from`).
+
+See [`examples/`](examples/) and the generated [`docs/reference/`](docs/reference/)
+(`application.md`, `database.md`, `envvar.md` + JSON schemas).
 
 ## Viewing secret values
 

@@ -1,0 +1,14 @@
+# A standalone EnvVar resource. An Application merges it in by name via `env_vars_from`.
+# Visible values use `value:`; sensitive values use `value_secret: ${env:NAME}`.
+api_version: iac-coolify/v1
+kind: EnvVar
+metadata:
+  name: app-config
+  project: demo
+  environment: staging
+spec:
+  vars:
+    - name: LOG_LEVEL
+      value: info
+    - name: FEATURE_FLAGS
+      value: "previews=on"

@@ -64,6 +64,11 @@ func (s Secret) Reveal() string { return s.value }
 // Origin returns the source declaration (e.g. "${env:DATABASE_URL}"). Safe to log.
 func (s Secret) Origin() string { return s.origin }
 
+// ValueEquals reports whether two secrets hold the same underlying value, without
+// revealing it. The diff engine uses this for Notify-only secret comparison
+// (secrets-policy.md §4.4): it learns a value changed without ever seeing the value.
+func (s Secret) ValueEquals(other Secret) bool { return s.value == other.value }
+
 // IsZero reports whether the Secret is unset.
 func (s Secret) IsZero() bool { return s.source == SourceUnset }
 

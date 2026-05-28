@@ -141,7 +141,7 @@ func TestApplicationParseRoundtrip(t *testing.T) {
 			Destination: resource.DestinationRef{Server: "localhost", Network: "coolify"},
 			FQDN:        "https://app.example.com",
 			Port:        3000,
-			EnvVars: []resource.EnvVar{
+			EnvVars: []resource.EnvVarEntry{
 				{Name: "NODE_ENV", Value: "production"},
 				{Name: "DATABASE_URL", ValueSecret: dbSecret},
 			},

@@ -8,6 +8,18 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
+func TestValueEquals(t *testing.T) {
+	a := Secret{value: "same", source: SourceEnv, origin: "${env:A}"}
+	b := Secret{value: "same", source: SourceEnv, origin: "${env:B}"} // different source, same value
+	c := Secret{value: "diff", source: SourceEnv, origin: "${env:A}"}
+	if !a.ValueEquals(b) {
+		t.Error("equal values must compare equal regardless of origin")
+	}
+	if a.ValueEquals(c) {
+		t.Error("different values must not compare equal")
+	}
+}
+
 func TestNewFromEnv(t *testing.T) {
 	tests := []struct {
 		name    string

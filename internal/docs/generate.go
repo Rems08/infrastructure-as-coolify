@@ -30,10 +30,18 @@ type StructDoc struct {
 	Fields []FieldDoc
 }
 
-// ExtractStructDocs parses the .go files in resourceDir and returns, in file then
-// declaration order, every struct that has at least one field carrying a non-empty
-// `iac:"doc=..."` tag.
-func ExtractStructDocs(resourceDir string) ([]StructDoc, error) {
+// ResourceDoc groups the documented structs declared in a single resource source file.
+// One ResourceDoc renders to one reference markdown page (and one JSON Schema).
+type ResourceDoc struct {
+	Slug    string // source filename without .go, e.g. "application"
+	Title   string // the primary (first declared) struct, e.g. "Application"
+	Structs []StructDoc
+}
+
+// ExtractResourceDocs parses the .go files in resourceDir and returns one ResourceDoc per
+// file that declares at least one struct carrying a non-empty `iac:"doc=..."` tag, in
+// filename order. Within a file, structs keep declaration order.
+func ExtractResourceDocs(resourceDir string) ([]ResourceDoc, error) {
 	entries, err := os.ReadDir(resourceDir)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", resourceDir, err)
@@ -48,13 +56,21 @@ func ExtractStructDocs(resourceDir string) ([]StructDoc, error) {
 	sort.Strings(names)
 
 	fset := token.NewFileSet()
-	var out []StructDoc
+	var out []ResourceDoc
 	for _, name := range names {
 		f, parseErr := parser.ParseFile(fset, filepath.Join(resourceDir, name), nil, 0)
 		if parseErr != nil {
 			return nil, fmt.Errorf("parse %s: %w", name, parseErr)
 		}
-		out = append(out, structsInFile(f)...)
+		structs := structsInFile(f)
+		if len(structs) == 0 {
+			continue
+		}
+		out = append(out, ResourceDoc{
+			Slug:    strings.TrimSuffix(name, ".go"),
+			Title:   structs[0].Name,
+			Structs: structs,
+		})
 	}
 	return out, nil
 }

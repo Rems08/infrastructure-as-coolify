@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Rems08/infrastructure-as-coolify/internal/resource/database",
+  "$ref": "#/$defs/Database",
+  "$defs": {
+    "Database": {
+      "properties": {
+        "api_version": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/DatabaseMeta"
+        },
+        "spec": {
+          "$ref": "#/$defs/DatabaseSpec"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "api_version",
+        "kind",
+        "metadata",
+        "spec"
+      ]
+    },
+    "DatabaseMeta": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "project",
+        "environment"
+      ]
+    },
+    "DatabaseSpec": {
+      "properties": {
+        "engine": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "destination": {
+          "$ref": "#/$defs/DestinationRef"
+        },
+        "public": {
+          "type": "boolean"
+        },
+        "public_port": {
+          "type": "integer"
+        },
+        "limits": {
+          "$ref": "#/$defs/LimitsSpec"
+        },
+        "password": {
+          "type": "string",
+          "pattern": "^\\$\\{(env|sops):[^}]+\\}$"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "engine",
+        "destination"
+      ]
+    },
+    "DestinationRef": {
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "network": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "server",
+        "network"
+      ]
+    },
+    "LimitsSpec": {
+      "properties": {
+        "cpu_shares": {
+          "type": "integer"
+        },
+        "memory": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    }
+  }
+}

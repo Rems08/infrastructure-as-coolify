@@ -1,0 +1,7 @@
++ Application.new will be created
+    + Application.new.fqdn = "https://new.example.com"
+    + Application.new.port = "8080"
+~ Application.web will be updated
+    ~ Application.web.fqdn: "https://old" -> "https://web.example.com"
+
+Plan: 1 to add, 1 to change, 0 to destroy.

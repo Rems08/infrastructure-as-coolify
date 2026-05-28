@@ -24,7 +24,7 @@ func newDocsCmd() *cobra.Command {
 			if err := docs.Generate(resourceDir, outDir); err != nil {
 				return err
 			}
-			cmd.Printf("Generated %s/application.md and %s/schema.json\n", outDir, outDir)
+			cmd.Printf("Generated reference docs and JSON schemas in %s\n", outDir)
 			return nil
 		},
 	}

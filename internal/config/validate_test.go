@@ -41,6 +41,31 @@ func TestValidateInvalidExample(t *testing.T) {
 	}
 }
 
+// TestValidateEnvVarExample covers critère §7 #25: a directory mixing an Application and
+// a standalone EnvVar validates, and the summary lists both kinds.
+func TestValidateEnvVarExample(t *testing.T) {
+	rep, err := Validate(filepath.Join("..", "..", "examples", "envvar"), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rep.OK() {
+		t.Fatalf("envvar example has issues: %+v", rep.Issues)
+	}
+	if len(rep.Apps) != 1 || rep.Apps[0] != "api" {
+		t.Errorf("apps = %v, want [api]", rep.Apps)
+	}
+	if len(rep.EnvVars) != 1 || rep.EnvVars[0] != "app-config" {
+		t.Errorf("envvars = %v, want [app-config]", rep.EnvVars)
+	}
+	var buf strings.Builder
+	if !WriteReport(&buf, rep) {
+		t.Fatal("WriteReport returned false for a clean report")
+	}
+	if want := "Validated 1 application + 1 envvar (no issues)"; !strings.Contains(buf.String(), want) {
+		t.Errorf("summary = %q, want substring %q", buf.String(), want)
+	}
+}
+
 // TestValidateLiteralSecretRejected covers critère §7 #13 at the config layer.
 func TestValidateLiteralSecretRejected(t *testing.T) {
 	path := filepath.Join("..", "..", "testdata", "secrets-canaris", "literal-rejected.yaml")

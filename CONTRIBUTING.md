@@ -4,9 +4,10 @@ Thanks for considering a contribution! This is an OSS Go project (Apache-2.0).
 
 ## Ground rules
 
-- **Go 1.22 language target, go1.23.12 toolchain** (pinned in `go.mod` + `Makefile`; see the
-  comment there for why). All business logic lives in `internal/`; `cmd/iac-coolify/` only
-  parses the CLI.
+- **Go 1.23 language target.** The `Makefile` pins toolchains per step (see the comment
+  there): build/test/vuln run on go1.25.10 (vuln-clean stdlib) and lint runs on go1.23.12
+  (golangci-lint v1.61 cannot read go ≥ 1.24 export data). All business logic lives in
+  `internal/`; `cmd/iac-coolify/` only parses the CLI.
 - **`make verify` must be green before every push.** It runs `gofmt`, `go vet`,
   `golangci-lint` (strict preset), `go test -race -cover`, and `govulncheck`. Never bypass
   hooks with `--no-verify`; fix the root cause instead.

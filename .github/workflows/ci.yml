@@ -9,14 +9,15 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  # golangci-lint v1.61 is built with go1.23 and cannot read export data produced by
+  # go >= 1.24, so the lint job runs on go1.23 specifically.
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-      - run: go mod download
       - name: gofmt
         run: gofmt -d . | tee /tmp/fmt-diff && test ! -s /tmp/fmt-diff
       - name: go vet
@@ -24,6 +25,17 @@ jobs:
       - uses: golangci/golangci-lint-action@v6
         with:
           version: v1.61.0
+
+  # test/build run on go1.25: the current patch line is the only one govulncheck reports
+  # as free of stdlib advisories.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - run: go mod download
       - name: go test
         run: go test ./... -race -cover
       - name: govulncheck
@@ -32,7 +44,7 @@ jobs:
           govulncheck ./...
 
   build:
-    needs: test
+    needs: [lint, test]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -45,5 +57,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.25'
       - run: GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build ./cmd/iac-coolify

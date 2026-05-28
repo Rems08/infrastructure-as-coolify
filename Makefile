@@ -3,11 +3,15 @@ BIN       := dist/iac-coolify
 PKG       := ./cmd/iac-coolify
 GOPATH_BIN := $(shell $(GO) env GOPATH)/bin
 
-# Pin the toolchain so local `make verify` matches CI. go1.23.12 is the only line
-# that satisfies every ratchet at once: golangci-lint v1.61 (built with go1.23)
-# cannot read export data from go ≥ 1.24, and go1.22 is EOL — its stdlib carries
-# GO-2025-3750 which govulncheck can never clear. Overridable: `make GOTOOLCHAIN=local`.
-GOTOOLCHAIN ?= go1.23.12
+# Toolchains are decoupled per step because no single Go version satisfies every
+# ratchet at once (as of 2026-05):
+#   * build/test/vuln run on go1.25.10 — the current patch is the only one govulncheck
+#     reports as free of stdlib advisories (go1.22/1.23 are EOL with unpatched CVEs).
+#   * lint runs on go1.23.12 — golangci-lint v1.61 is built with go1.23 and cannot read
+#     export data produced by go ≥ 1.24, so it must analyse under a go1.23 toolchain.
+# Overridable, e.g. `make GOTOOLCHAIN=local test`.
+GOTOOLCHAIN     ?= go1.25.10
+LINT_GOTOOLCHAIN ?= go1.23.12
 export GOTOOLCHAIN
 
 .PHONY: all build test lint fmt fmt-check vet vuln verify clean tools
@@ -22,7 +26,7 @@ test:
 	@$(GO) tool cover -func=cover.out | tail -1
 
 lint:
-	$(GOPATH_BIN)/golangci-lint run
+	GOTOOLCHAIN=$(LINT_GOTOOLCHAIN) $(GOPATH_BIN)/golangci-lint run
 
 fmt:
 	gofmt -w .

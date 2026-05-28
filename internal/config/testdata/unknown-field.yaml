@@ -1,0 +1,12 @@
+api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: typo
+  project: test
+  environment: staging
+spec:
+  build_pack_typo: dockerfile
+  destination:
+    server: localhost
+    network: coolify
+  port: 3000

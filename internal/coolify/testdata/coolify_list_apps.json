@@ -1,0 +1,24 @@
+[
+  {
+    "uuid": "hzw53gga4fcgpsl706h5rgmo",
+    "name": "Beenaire Back Office",
+    "fqdn": "https://admin.beenaire.com",
+    "build_pack": "dockerfile",
+    "docker_registry_image_name": "registry.gitlab.com/beenaire/admin-beenaire-back-office",
+    "docker_registry_image_tag": "v1-0-11",
+    "git_branch": "main",
+    "ports_exposes": "3000",
+    "status": "running:healthy"
+  },
+  {
+    "uuid": "rngkbv4z26wok0pkq4pbhnwe",
+    "name": "restaurant-core-api",
+    "fqdn": "https://api.beenaire.com",
+    "build_pack": "dockerfile",
+    "docker_registry_image_name": "registry.gitlab.com/beenaire/restaurant-core-api",
+    "docker_registry_image_tag": "v2-3-0",
+    "git_branch": "main",
+    "ports_exposes": "8000",
+    "status": "running:healthy"
+  }
+]

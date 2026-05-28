@@ -1,0 +1,28 @@
+# Simplified from beenaire-ops/coolify/snapshots/applications/beenaire-back-office.yaml.
+# The Coolify UUID, runtime status and computed fields are intentionally absent — they
+# live in the Coolify API and are resolved by name, never written to YAML (G-OBS-8).
+api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: back-office
+  project: beenaire
+  environment: staging
+spec:
+  build_pack: dockerimage
+  image:
+    name: registry.gitlab.com/beenaire/admin-beenaire-back-office
+    tag: v1-0-11
+  destination:
+    server: localhost
+    network: coolify
+  fqdn: https://admin.beenaire.com
+  port: 3000
+  limits:
+    cpu_shares: 1024
+  preview:
+    url_template: "{{pr_id}}.{{domain}}"
+  env_vars:
+    - name: NODE_ENV
+      value: production
+    - name: DATABASE_URL
+      value_secret: ${env:DATABASE_URL_STAGING}

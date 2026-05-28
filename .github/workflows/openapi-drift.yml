@@ -1,0 +1,64 @@
+name: OpenAPI drift watch
+
+# Mitigation C-S7.1 (threat-model T-S7.1): Coolify v4.x can change the API
+# silently. This nightly job compares the pinned spec against the HEAD of the
+# upstream v4.x branch and opens an issue when they diverge.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch upstream v4.x openapi.yaml
+        run: |
+          curl -sSL "https://raw.githubusercontent.com/coollabsio/coolify/v4.x/openapi.yaml" \
+            -o /tmp/upstream-openapi.yaml
+          echo "upstream_bytes=$(wc -c < /tmp/upstream-openapi.yaml)" >> "$GITHUB_ENV"
+
+      - name: Diff against pinned spec
+        id: diff
+        run: |
+          if diff -q testdata/openapi/coolify-v4.yaml /tmp/upstream-openapi.yaml >/dev/null; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+            diff -u testdata/openapi/coolify-v4.yaml /tmp/upstream-openapi.yaml | head -200 > /tmp/drift.txt || true
+          fi
+
+      - name: Open drift issue
+        if: steps.diff.outputs.drift == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('/tmp/drift.txt', 'utf8');
+            const title = 'OpenAPI drift: Coolify v4.x diverged from pinned spec';
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'kind/openapi-drift',
+            });
+            if (existing.data.length > 0) {
+              core.info('Drift issue already open, skipping.');
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              labels: ['kind/openapi-drift'],
+              body: 'Upstream `coollabsio/coolify@v4.x` openapi.yaml differs from `testdata/openapi/coolify-v4.yaml`.\n\n' +
+                    'Review the diff, re-pin via `COMMIT_SHA`, refresh the `.sha256` sidecar, and re-run client tests.\n\n' +
+                    '```diff\n' + body + '\n```',
+            });

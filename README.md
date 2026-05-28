@@ -9,8 +9,17 @@ future Bubble Tea TUI for live exploration.
 
 **Status:** 🚧 beta — Coolify **v4.x only**. APIs may change before `v1.0.0`.
 
-The Coolify OpenAPI spec is pinned in [`testdata/openapi/COMMIT_SHA`](testdata/openapi/COMMIT_SHA)
-(currently commit `5a27427`). A nightly CI job watches upstream `v4.x` for drift.
+The Coolify **OpenAPI commit SHA** is pinned in
+[`testdata/openapi/COMMIT_SHA`](testdata/openapi/COMMIT_SHA) (currently `5a27427`), with a
+SHA-256 sidecar verified at boot. A nightly CI job watches upstream `v4.x` for drift.
+
+### Supported platforms
+
+| OS | amd64 | arm64 |
+|---|---|---|
+| Linux | ✅ | ✅ |
+| macOS | ✅ | ✅ |
+| Windows | ✅ | — |
 
 ## Quick start
 

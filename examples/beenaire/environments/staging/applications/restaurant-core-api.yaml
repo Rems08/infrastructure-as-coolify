@@ -1,0 +1,24 @@
+api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: restaurant-core-api
+  project: beenaire
+  environment: staging
+spec:
+  build_pack: dockerimage
+  image:
+    name: registry.gitlab.com/beenaire/restaurant-core-api
+    tag: v2-3-0
+  destination:
+    server: localhost
+    network: coolify
+  fqdn: https://api.beenaire.com
+  port: 8000
+  health_check:
+    enabled: true
+    path: /health
+  env_vars:
+    - name: DJANGO_SETTINGS_MODULE
+      value: config.settings.staging
+    - name: SECRET_KEY
+      value_secret: ${env:DJANGO_SECRET_KEY_STAGING}

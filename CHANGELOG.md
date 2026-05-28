@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased] - 2026-05-28
 
+### Added (Wave 3)
+
+- `iac-coolify apply`: reconciles the desired state with a live Coolify instance, creating
+  resources in dependency order (project → environment → application) via a topological
+  sort. Flags: `--auto-approve` (mandatory in a non-interactive session), `--dry-run`
+  (offline preview), `--target` (single resource), `--parallelism=1`. Exit codes `0`
+  (success), `1` (error), `2` (partial: some resources changed before a failure).
+- Reconciliation engine (`internal/apply`): sequential apply with no partial rollback,
+  threading newly-created parent UUIDs forward so dependents resolve them. Every write
+  carries an `Idempotency-Key` (sha256 of method, path and body) so a retried apply cannot
+  create duplicates.
+- Append-only audit log (`.iac-coolify/audit.log`, `0600`): one JSON line per applied
+  operation recording the resource, op, and the source declarations of any secrets — never
+  their resolved values.
+- `Project` and `Environment` resources, with `validate` and `docs gen` support.
+- Coolify write methods: create/update/delete applications (build-pack-aware endpoint
+  selection), create/delete projects and environments. A `404` on delete is a no-op.
+- `build_pack` → endpoint mapping for all four build packs. `dockerimage` is creatable from
+  the current `Application` schema; the others need source fields not yet modelled and
+  return an actionable error.
+- The UUID resolver now also maps projects, environments and destination servers.
+
 ### Added (Wave 2)
 
 - `iac-coolify plan`: Terraform-style per-field diff between the desired YAML and live

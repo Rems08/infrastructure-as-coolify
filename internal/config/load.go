@@ -61,6 +61,30 @@ func LoadEnvVar(path string) (resource.EnvVar, error) {
 	return ev, nil
 }
 
+// LoadApplications loads and validates every Application under target (a file or a
+// directory). Non-Application resources are skipped. It returns the first error found.
+func LoadApplications(target string) ([]resource.Application, error) {
+	files, err := collectFiles(target)
+	if err != nil {
+		return nil, err
+	}
+	var apps []resource.Application
+	for _, kf := range files {
+		if kf.kind != resource.KindApplication {
+			continue
+		}
+		app, lErr := LoadApplication(kf.path)
+		if lErr != nil {
+			return nil, lErr
+		}
+		if vErr := app.Validate(); vErr != nil {
+			return nil, fmt.Errorf("%s: %w", kf.path, vErr)
+		}
+		apps = append(apps, app)
+	}
+	return apps, nil
+}
+
 // loadStrict reads path and strictly decodes it into dst (unknown/duplicate fields are
 // rejected).
 func loadStrict(path string, dst any) error {

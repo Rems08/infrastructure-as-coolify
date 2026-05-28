@@ -172,6 +172,10 @@ func (c *Client) GetApplication(ctx context.Context, uuid string) (Application, 
 	return app, nil
 }
 
+// OpenAPIChecksum returns the pinned spec sha256, recorded in the state cache so a later
+// run can tell whether it planned against the same API contract.
+func OpenAPIChecksum() string { return openAPIChecksum }
+
 // VerifyOpenAPIChecksum reports whether spec matches the pinned sha256 (C-S7.3).
 // Wiring it into command boot (refuse to run on mismatch) lands when the spec is
 // loaded for endpoint validation in Wave 2.

@@ -1,0 +1,67 @@
+# golangci-lint strict preset (cf. CLAUDE.md §6 + plan.md §2).
+# Pinned to golangci-lint v1.61 (see .github/workflows/ci.yml).
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    # base
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    # complexity
+    - gocyclo
+    - gocognit
+    - funlen
+    # style
+    - revive
+    # security
+    - gosec
+    # bugs
+    - bodyclose
+    - errorlint
+    - nilerr
+    - noctx
+    # opinionated
+    - gocritic
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  gocognit:
+    min-complexity: 20
+  funlen:
+    lines: 80
+    statements: 50
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment # micro-optimisation, noise vs readability
+  revive:
+    rules:
+      - name: exported
+      - name: error-strings
+      - name: error-naming
+      - name: unused-parameter
+  gosec:
+    excludes:
+      - G104 # handled by errcheck
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    # Test files: table-driven tests legitimately exceed length/complexity bounds,
+    # and hardcoded "secrets" in fixtures are canaries, not real credentials.
+    - path: _test\.go
+      linters:
+        - funlen
+        - gocyclo
+        - gocognit
+        - gosec
+        - noctx

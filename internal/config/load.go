@@ -61,6 +61,24 @@ func LoadEnvVar(path string) (resource.EnvVar, error) {
 	return ev, nil
 }
 
+// LoadProject parses a YAML file into a Project with strict decoding.
+func LoadProject(path string) (resource.Project, error) {
+	var p resource.Project
+	if err := loadStrict(path, &p); err != nil {
+		return p, err
+	}
+	return p, nil
+}
+
+// LoadEnvironment parses a YAML file into an Environment with strict decoding.
+func LoadEnvironment(path string) (resource.Environment, error) {
+	var e resource.Environment
+	if err := loadStrict(path, &e); err != nil {
+		return e, err
+	}
+	return e, nil
+}
+
 // LoadApplications loads and validates every Application under target (a file or a
 // directory). Non-Application resources are skipped. It returns the first error found.
 func LoadApplications(target string) ([]resource.Application, error) {
@@ -83,6 +101,54 @@ func LoadApplications(target string) ([]resource.Application, error) {
 		apps = append(apps, app)
 	}
 	return apps, nil
+}
+
+// LoadProjects loads and validates every Project under target (a file or directory).
+// Non-Project resources are skipped. It returns the first error found.
+func LoadProjects(target string) ([]resource.Project, error) {
+	files, err := collectFiles(target)
+	if err != nil {
+		return nil, err
+	}
+	var projects []resource.Project
+	for _, kf := range files {
+		if kf.kind != resource.KindProject {
+			continue
+		}
+		p, lErr := LoadProject(kf.path)
+		if lErr != nil {
+			return nil, lErr
+		}
+		if vErr := p.Validate(); vErr != nil {
+			return nil, fmt.Errorf("%s: %w", kf.path, vErr)
+		}
+		projects = append(projects, p)
+	}
+	return projects, nil
+}
+
+// LoadEnvironments loads and validates every Environment under target (a file or
+// directory). Non-Environment resources are skipped. It returns the first error found.
+func LoadEnvironments(target string) ([]resource.Environment, error) {
+	files, err := collectFiles(target)
+	if err != nil {
+		return nil, err
+	}
+	var envs []resource.Environment
+	for _, kf := range files {
+		if kf.kind != resource.KindEnvironment {
+			continue
+		}
+		e, lErr := LoadEnvironment(kf.path)
+		if lErr != nil {
+			return nil, lErr
+		}
+		if vErr := e.Validate(); vErr != nil {
+			return nil, fmt.Errorf("%s: %w", kf.path, vErr)
+		}
+		envs = append(envs, e)
+	}
+	return envs, nil
 }
 
 // loadStrict reads path and strictly decodes it into dst (unknown/duplicate fields are

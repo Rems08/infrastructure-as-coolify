@@ -1,0 +1,4 @@
+api_version: iac-coolify/v1
+kind: Project
+metadata:
+  name: Bad_Name

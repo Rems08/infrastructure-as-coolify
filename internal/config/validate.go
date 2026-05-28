@@ -21,10 +21,12 @@ type Issue struct {
 // Report is the outcome of a validate run. Each slice holds the logical names of the
 // successfully validated resources of that kind.
 type Report struct {
-	Apps      []string
-	Databases []string
-	EnvVars   []string
-	Issues    []Issue
+	Projects     []string
+	Environments []string
+	Apps         []string
+	Databases    []string
+	EnvVars      []string
+	Issues       []Issue
 }
 
 // OK reports whether validation found no issues.
@@ -49,6 +51,8 @@ func Validate(target string, strict bool) (Report, error) {
 	for _, f := range files {
 		validateFile(f, strict, &rep)
 	}
+	sort.Strings(rep.Projects)
+	sort.Strings(rep.Environments)
 	sort.Strings(rep.Apps)
 	sort.Strings(rep.Databases)
 	sort.Strings(rep.EnvVars)
@@ -88,7 +92,8 @@ func collectFiles(target string) ([]kindFile, error) {
 
 func isKnownKind(kind string) bool {
 	switch kind {
-	case resource.KindApplication, resource.KindDatabase, resource.KindEnvVar:
+	case resource.KindProject, resource.KindEnvironment,
+		resource.KindApplication, resource.KindDatabase, resource.KindEnvVar:
 		return true
 	default:
 		return false
@@ -102,6 +107,10 @@ func isYAML(path string) bool {
 
 func validateFile(kf kindFile, strict bool, rep *Report) {
 	switch kf.kind {
+	case resource.KindProject:
+		validateProject(kf.path, rep)
+	case resource.KindEnvironment:
+		validateEnvironment(kf.path, rep)
 	case resource.KindApplication:
 		validateApplication(kf.path, strict, rep)
 	case resource.KindDatabase:
@@ -114,6 +123,32 @@ func validateFile(kf kindFile, strict bool, rep *Report) {
 			Message: fmt.Sprintf("unsupported or missing kind %q", kf.kind),
 		})
 	}
+}
+
+func validateProject(path string, rep *Report) {
+	p, err := LoadProject(path)
+	if err != nil {
+		rep.Issues = append(rep.Issues, Issue{File: path, Message: err.Error()})
+		return
+	}
+	if err := p.Validate(); err != nil {
+		rep.Issues = append(rep.Issues, Issue{File: path, Message: err.Error()})
+		return
+	}
+	rep.Projects = append(rep.Projects, p.Metadata.Name)
+}
+
+func validateEnvironment(path string, rep *Report) {
+	e, err := LoadEnvironment(path)
+	if err != nil {
+		rep.Issues = append(rep.Issues, Issue{File: path, Message: err.Error()})
+		return
+	}
+	if err := e.Validate(); err != nil {
+		rep.Issues = append(rep.Issues, Issue{File: path, Message: err.Error()})
+		return
+	}
+	rep.Environments = append(rep.Environments, e.Metadata.Name)
 }
 
 func validateApplication(path string, strict bool, rep *Report) {
@@ -200,6 +235,8 @@ func summaryLine(rep Report) string {
 		names []string
 	}
 	groups := []group{
+		{"project", rep.Projects},
+		{"environment", rep.Environments},
 		{"application", rep.Apps},
 		{"database", rep.Databases},
 		{"envvar", rep.EnvVars},

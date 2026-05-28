@@ -69,6 +69,10 @@ func TestResolveUUIDsFromHTTPTest(t *testing.T) {
 		"/api/v1/projects/proj-lab/environments": `[
 			{"id":20,"name":"staging","project_id":2}
 		]`,
+		"/api/v1/servers": `[
+			{"uuid":"srv-1","name":"localhost"},
+			{"uuid":"srv-2","name":"edge"}
+		]`,
 		"/api/v1/applications": `[
 			{"uuid":"uuid-web-stg","name":"web","environment_id":10},
 			{"uuid":"uuid-web-prod","name":"web","environment_id":11},
@@ -83,19 +87,39 @@ func TestResolveUUIDsFromHTTPTest(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	pKey := func(name string) state.ResourceKey {
+		return state.ResourceKey{Kind: resource.KindProject, Name: name}
+	}
+	eKey := func(project, name string) state.ResourceKey {
+		return state.ResourceKey{Project: project, Kind: resource.KindEnvironment, Name: name}
+	}
+	sKey := func(name string) state.ResourceKey {
+		return state.ResourceKey{Kind: state.KindServer, Name: name}
+	}
 	want := map[state.ResourceKey]string{
+		// Applications: keyed (project, env, name) → uuid.
 		key("beenaire", "staging", "web"):    "uuid-web-stg",  // found
 		key("beenaire", "production", "web"): "uuid-web-prod", // multi-env, same name
 		key("beenaire", "staging", "api"):    "uuid-api-stg",
 		key("labs", "staging", "x"):          "uuid-lab-x", // multi-project
+		// Projects → uuid.
+		pKey("beenaire"): "proj-bee",
+		pKey("labs"):     "proj-lab",
+		// Environments → name (no UUID in the schema).
+		eKey("beenaire", "staging"):    "staging",
+		eKey("beenaire", "production"): "production",
+		eKey("labs", "staging"):        "staging",
+		// Servers → uuid.
+		sKey("localhost"): "srv-1",
+		sKey("edge"):      "srv-2",
 	}
 	if len(m) != len(want) {
 		t.Fatalf("map size = %d, want %d (orphan must be skipped): %+v", len(m), len(want), m)
 	}
-	for k, wantUUID := range want {
+	for k, wantID := range want {
 		got, ok := m.Lookup(k)
-		if !ok || got != wantUUID {
-			t.Errorf("Lookup(%v) = %q,%v want %q", k, got, ok, wantUUID)
+		if !ok || got != wantID {
+			t.Errorf("Lookup(%v) = %q,%v want %q", k, got, ok, wantID)
 		}
 	}
 
@@ -112,6 +136,7 @@ func TestResolveUUIDsFromHTTPTest(t *testing.T) {
 func TestResolveEmpty(t *testing.T) {
 	bodies := map[string]string{
 		"/api/v1/projects":     `[]`,
+		"/api/v1/servers":      `[]`,
 		"/api/v1/applications": `[]`,
 	}
 	srv := serve(t, bodies, nil)
@@ -138,6 +163,17 @@ func TestResolveEnvironmentsError(t *testing.T) {
 	srv := serve(t, bodies, map[string]int{"/api/v1/projects/proj-bee/environments": http.StatusBadRequest})
 	if _, err := state.Resolve(context.Background(), newClient(t, srv.URL)); err == nil {
 		t.Fatal("want error when /environments fails")
+	}
+}
+
+func TestResolveServersError(t *testing.T) {
+	bodies := map[string]string{
+		"/api/v1/projects":                       `[{"id":1,"uuid":"proj-bee","name":"beenaire"}]`,
+		"/api/v1/projects/proj-bee/environments": `[]`,
+	}
+	srv := serve(t, bodies, map[string]int{"/api/v1/servers": http.StatusInternalServerError})
+	if _, err := state.Resolve(context.Background(), newClient(t, srv.URL)); err == nil {
+		t.Fatal("want error when /servers fails")
 	}
 }
 

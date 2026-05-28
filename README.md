@@ -32,6 +32,11 @@ export COOLIFY_API_TOKEN=...                       # plus --coolify-url or COOLI
 iac-coolify plan examples/minimal/                 # runs offline (all-new) if unconfigured
 iac-coolify plan examples/minimal/ --output=json --detailed-exitcode
 
+# Apply the changes (creates projects and environments before applications)
+iac-coolify apply examples/full-project/ --dry-run # offline preview, mutates nothing
+iac-coolify apply examples/full-project/           # interactive confirmation prompt
+iac-coolify apply examples/full-project/ --auto-approve   # required in CI / non-interactive
+
 # Generate the reference documentation from the resource structs
 iac-coolify docs gen
 ```
@@ -42,12 +47,19 @@ changes), `2` (changes pending), or `1` (error). Secret values follow a Notify-o
 a change is announced (`resolved value changed, source ${env:X} unchanged`) but never shown.
 Behind a Cloudflare Access gateway, set `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET`.
 
+`apply` reconciles the desired state, creating resources in dependency order (project →
+environment → application). It refuses to run in a non-interactive session unless
+`--auto-approve` is given, and exits `0` (success), `1` (error), or `2` (partial: some
+resources changed before a failure — no rollback, the append-only `.iac-coolify/audit.log`
+records each applied operation and the sources of any secrets, never their values). Every
+write carries an `Idempotency-Key`, so a retried apply cannot create duplicates.
+
 ## Why
 
 | | `iac-coolify` | `coollabsio/coolify-cli` | `SierraJC/terraform-provider-coolify` |
 |---|---|---|---|
 | Model | declarative YAML | imperative wrapper | declarative HCL |
-| `plan`/`apply`/`destroy` | ✅ `plan` (apply/destroy on roadmap) | ❌ | ✅ |
+| `plan`/`apply`/`destroy` | ✅ `plan` + `apply` (destroy on roadmap) | ❌ | ✅ |
 | State file | stateless-first | n/a | tfstate required |
 | Native to Coolify | ✅ | ✅ | wraps Terraform |
 
@@ -58,18 +70,25 @@ Resources are described in a `coolify/` directory tree, one file per resource:
 ```
 coolify/
   coolify.yaml                                   # global config (api_url, required_coolify)
-  projects/<name>.yaml
+  project.yaml                                   # kind: Project
+  environments/<env>/environment.yaml            # kind: Environment
   environments/<env>/applications/<app>.yaml     # kind: Application
   environments/<env>/databases/<db>.yaml         # kind: Database (8 engines)
   environments/<env>/envvars/<set>.yaml          # kind: EnvVar (shared, referenced via env_vars_from)
 ```
 
-Supported resource kinds: **Application**, **Database** (`postgresql`, `mysql`, `mariadb`,
-`mongodb`, `redis`, `keydb`, `dragonfly`, `clickhouse`), and standalone **EnvVar** sets that
-an Application merges in by name (`env_vars_from`).
+Supported resource kinds: **Project**, **Environment**, **Application**, **Database**
+(`postgresql`, `mysql`, `mariadb`, `mongodb`, `redis`, `keydb`, `dragonfly`, `clickhouse`),
+and standalone **EnvVar** sets that an Application merges in by name (`env_vars_from`).
+`apply` creates projects and environments before the applications that reference them.
+
+> **`apply` build packs:** the `Application` schema currently models a prebuilt image, so
+> `build_pack: dockerimage` is the build pack `apply` can create today. `dockerfile`,
+> `nixpacks` and `docker-compose` validate and `plan`, but creating them needs source
+> fields (a Dockerfile body, or a git repository) the schema does not yet declare.
 
 See [`examples/`](examples/) and the generated [`docs/reference/`](docs/reference/)
-(`application.md`, `database.md`, `envvar.md` + JSON schemas).
+(`project.md`, `environment.md`, `application.md`, `database.md`, `envvar.md` + JSON schemas).
 
 ## Viewing secret values
 

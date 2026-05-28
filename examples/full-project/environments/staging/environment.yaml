@@ -1,0 +1,7 @@
+api_version: iac-coolify/v1
+kind: Environment
+metadata:
+  name: staging
+  project: beenaire
+spec:
+  description: Staging environment

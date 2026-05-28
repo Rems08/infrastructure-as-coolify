@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Rems08/infrastructure-as-coolify/internal/resource/environment",
+  "$ref": "#/$defs/Environment",
+  "$defs": {
+    "Environment": {
+      "properties": {
+        "api_version": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/EnvironmentMeta"
+        },
+        "spec": {
+          "$ref": "#/$defs/EnvironmentSpec"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "api_version",
+        "kind",
+        "metadata",
+        "spec"
+      ]
+    },
+    "EnvironmentMeta": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "project"
+      ]
+    },
+    "EnvironmentSpec": {
+      "properties": {
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    }
+  }
+}

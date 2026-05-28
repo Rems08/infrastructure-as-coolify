@@ -131,6 +131,33 @@ func (c *Client) ListApplications(ctx context.Context) ([]Application, error) {
 	return apps, nil
 }
 
+// ListProjects fetches all projects via GET /api/v1/projects.
+func (c *Client) ListProjects(ctx context.Context) ([]Project, error) {
+	req, err := c.newRequest(ctx, "/projects")
+	if err != nil {
+		return nil, err
+	}
+	var projects []Project
+	if err := c.getJSON(req, &projects, "GET projects"); err != nil {
+		return nil, err
+	}
+	return projects, nil
+}
+
+// ListEnvironments fetches a project's environments via
+// GET /api/v1/projects/{uuid}/environments.
+func (c *Client) ListEnvironments(ctx context.Context, projectUUID string) ([]Environment, error) {
+	req, err := c.newRequest(ctx, "/projects/"+projectUUID+"/environments")
+	if err != nil {
+		return nil, err
+	}
+	var envs []Environment
+	if err := c.getJSON(req, &envs, "GET environments "+projectUUID); err != nil {
+		return nil, err
+	}
+	return envs, nil
+}
+
 // GetApplication fetches a single application by UUID via GET /api/v1/applications/{uuid}.
 // It is the documented endpoint used to read remote state for the plan diff.
 func (c *Client) GetApplication(ctx context.Context, uuid string) (Application, error) {

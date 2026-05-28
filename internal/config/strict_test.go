@@ -35,8 +35,8 @@ func TestDetectSecretLike(t *testing.T) {
 	}
 }
 
-// TestValidateStrictEntropyDetection covers critère §7 #16 (C-S2.5): custom-format
-// high-entropy secrets in visible values are flagged by --strict.
+// TestValidateStrictEntropyDetection asserts custom-format high-entropy secrets in
+// visible values are flagged by --strict.
 func TestValidateStrictEntropyDetection(t *testing.T) {
 	for i := 1; i <= 5; i++ {
 		path := filepath.Join("testdata", fmt.Sprintf("custom-secret-%d.yaml", i))

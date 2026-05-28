@@ -24,9 +24,8 @@ type revealSite struct {
 	pkg  string
 }
 
-// TestRevealCallSitesAllowlisted covers critère §7 #12 (C-L0.2): it scans the AST
-// of cmd/ + internal/ and fails if Secret.Reveal() is called from any package
-// outside the allowlist.
+// TestRevealCallSitesAllowlisted scans the AST of cmd/ + internal/ and fails if
+// Secret.Reveal() is called from any package outside the allowlist.
 func TestRevealCallSitesAllowlisted(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {

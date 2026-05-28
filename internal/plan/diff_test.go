@@ -84,7 +84,8 @@ func TestDiffNoop(t *testing.T) {
 	}
 }
 
-// TestSecretDiffNotifyOnlyNeverLeaksValue covers critère §7 #23.
+// TestSecretDiffNotifyOnlyNeverLeaksValue asserts a secret value change is announced
+// without the value, hash, or any partial appearing in the diff output.
 func TestSecretDiffNotifyOnlyNeverLeaksValue(t *testing.T) {
 	const secretVal = "super-secret-VALUE-do-not-leak"
 

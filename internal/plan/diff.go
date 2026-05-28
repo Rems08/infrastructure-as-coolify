@@ -1,7 +1,7 @@
 // Package plan computes the semantic difference between the desired state (YAML config)
 // and the actual state (live Coolify), rendering it Terraform-style. The diff is
-// per-field and secret-aware: secret values follow the Notify-only policy
-// (secrets-policy.md §4.4) and never appear, in any form, in the output.
+// per-field and secret-aware: secret values follow the Notify-only policy and never
+// appear, in any form, in the output.
 package plan
 
 import (
@@ -135,8 +135,8 @@ func diffValue(path string, old, newv Value) (Change, bool) {
 	}
 }
 
-// diffSecret implements the Notify-only secret diff (secrets-policy.md §4.4): only the
-// source declaration is ever shown; a value change with an unchanged source is announced
+// diffSecret implements the Notify-only secret diff: only the source declaration is ever
+// shown; a value change with an unchanged source is announced
 // without exposing the value or any hash.
 func diffSecret(path string, old, newv secrets.Secret) (Change, bool) {
 	if old.Origin() != newv.Origin() {

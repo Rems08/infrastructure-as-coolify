@@ -153,9 +153,9 @@ func cfAccessCapture(t *testing.T, body string) (*httptest.Server, *map[string]s
 	return srv, &seen
 }
 
-// TestCFAccessHeadersPresentWhenConfigured covers critère §7 #26: both CF-Access
-// headers are sent on every request when the client is configured with them, and the
-// secret reaches the wire only via the allowlisted Reveal() boundary.
+// TestCFAccessHeadersPresentWhenConfigured asserts both CF-Access headers are sent on
+// every request when the client is configured with them, and the secret reaches the wire
+// only via the allowlisted Reveal() boundary.
 func TestCFAccessHeadersPresentWhenConfigured(t *testing.T) {
 	srv, seen := cfAccessCapture(t, "[]")
 
@@ -189,8 +189,8 @@ func TestCFAccessHeadersPresentWhenConfigured(t *testing.T) {
 	}
 }
 
-// TestCFAccessHeadersAbsentWhenEmpty covers critère §7 #26: no CF Access headers leak
-// onto requests for a client configured without them.
+// TestCFAccessHeadersAbsentWhenEmpty asserts no CF Access headers leak onto requests for
+// a client configured without them.
 func TestCFAccessHeadersAbsentWhenEmpty(t *testing.T) {
 	srv, seen := cfAccessCapture(t, "[]")
 	if _, err := newTestClient(t, srv.URL).ListApplications(context.Background()); err != nil {
@@ -224,7 +224,8 @@ func TestNewClient_CFAccessHalfConfigured(t *testing.T) {
 	}
 }
 
-// TestOpenAPIChecksumVerifiedOnBoot covers critère §7 #19 (C-S7.3).
+// TestOpenAPIChecksumVerifiedOnBoot asserts the pinned spec passes checksum verification
+// and a tampered spec is rejected.
 func TestOpenAPIChecksumVerifiedOnBoot(t *testing.T) {
 	specPath := filepath.Join("..", "..", "testdata", "openapi", "coolify-v4.yaml")
 	spec, err := os.ReadFile(specPath)

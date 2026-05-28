@@ -20,8 +20,8 @@ import (
 
 // openAPIChecksum is the sha256 of the pinned spec testdata/openapi/coolify-v4.yaml
 // (kept in sync with its .sha256 sidecar and testdata/openapi/COMMIT_SHA). It lets
-// the binary verify spec integrity at boot before trusting any endpoint (C-S7.3,
-// threat-model T-S7.3). The nightly openapi-drift workflow watches upstream v4.x.
+// the binary verify spec integrity at boot before trusting any endpoint. The nightly
+// openapi-drift workflow watches upstream v4.x.
 const openAPIChecksum = "e98fa2b00ce84fb9eae326999c89e6b9d87e96c65528ba7e1da754010cb44413"
 
 // maxErrorBodyBytes caps how much of a non-2xx response body is echoed in an error,
@@ -59,13 +59,13 @@ func NewClient(opts Options) (*Client, error) {
 		return nil, fmt.Errorf(`coolify: token required (build via secrets.NewFromEnv("COOLIFY_API_TOKEN"))`)
 	}
 	// CF Access is all-or-nothing: a half-configured pair is a config bug, not a
-	// silent no-op (validate at the boundary, cf. CLAUDE.md §5).
+	// silent no-op (validate at the boundary).
 	if (opts.CFAccessClientID != "") != !opts.CFAccessClientSecret.IsZero() {
 		return nil, fmt.Errorf("coolify: CF Access requires both CFAccessClientID and CFAccessClientSecret, or neither")
 	}
 	rc := retryablehttp.NewClient()
 	rc.RetryMax = 3
-	// Bounded backoff so a 429/5xx storm can never busy-loop (threat-model T-S1.8).
+	// Bounded backoff so a 429/5xx storm can never busy-loop.
 	// retryablehttp's default backoff already honours the Retry-After header.
 	rc.RetryWaitMin = 1 * time.Second
 	rc.RetryWaitMax = 30 * time.Second
@@ -176,9 +176,7 @@ func (c *Client) GetApplication(ctx context.Context, uuid string) (Application, 
 // run can tell whether it planned against the same API contract.
 func OpenAPIChecksum() string { return openAPIChecksum }
 
-// VerifyOpenAPIChecksum reports whether spec matches the pinned sha256 (C-S7.3).
-// Wiring it into command boot (refuse to run on mismatch) lands when the spec is
-// loaded for endpoint validation in Wave 2.
+// VerifyOpenAPIChecksum reports whether spec matches the pinned sha256.
 func VerifyOpenAPIChecksum(spec []byte) error {
 	sum := sha256.Sum256(spec)
 	got := hex.EncodeToString(sum[:])

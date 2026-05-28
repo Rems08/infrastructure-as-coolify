@@ -70,8 +70,8 @@ func TestResolveEnvInterpolation(t *testing.T) {
 	}
 }
 
-// TestResolveEnvInterpolation_IntCast verifies the downstream int-parse contract
-// (cf. secrets-policy.md §2.2): "${env:REPLICAS}" resolves to "5" then parses to 5.
+// TestResolveEnvInterpolation_IntCast verifies the downstream int-parse contract:
+// "${env:REPLICAS}" resolves to "5" then parses to 5.
 func TestResolveEnvInterpolation_IntCast(t *testing.T) {
 	t.Setenv("REPLICAS", "5")
 	got, err := ResolveEnvInterpolation("${env:REPLICAS}")

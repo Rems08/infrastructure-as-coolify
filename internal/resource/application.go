@@ -15,15 +15,15 @@ import (
 	"github.com/Rems08/infrastructure-as-coolify/internal/secrets"
 )
 
-// APIVersion is the only accepted apiVersion value in Wave 1.
+// APIVersion is the only accepted apiVersion value.
 const APIVersion = "iac-coolify/v1"
 
 // KindApplication is the kind discriminator for Application resources.
 const KindApplication = "Application"
 
 // buildPacks is the user-facing IaC enum. It intentionally differs from the upstream
-// Coolify enum (see internal/coolify G-W1-build_pack-enum-mismatch); the IaC→API
-// mapping lands with `apply` in Wave 3.
+// Coolify enum (see internal/coolify); the IaC→API mapping is applied at reconciliation
+// time, not stored here.
 var buildPacks = map[string]bool{
 	"dockerfile":     true,
 	"dockerimage":    true,
@@ -90,16 +90,16 @@ type PreviewSpec struct {
 }
 
 // EnvVarEntry models a single Coolify env var. Exactly one of Value / ValueSecret must
-// be set (cf. secrets-policy.md §3.2): the YAML field chosen determines whether the value
-// is visible (`value`) or REDACTED (`value_secret`). It is shared by an Application's
-// inline `env_vars` and by the standalone EnvVar resource (see envvar.go).
+// be set: the YAML field chosen determines whether the value is visible (`value`) or
+// REDACTED (`value_secret`). It is shared by an Application's inline `env_vars` and by
+// the standalone EnvVar resource (see envvar.go).
 type EnvVarEntry struct {
 	Name        string         `yaml:"name" json:"name" iac:"doc=Variable name,required"`
 	Value       string         `yaml:"value,omitempty" json:"value,omitempty" iac:"doc=Visible value (supports ${env:VAR} interpolation); use value_secret for sensitive values"`
 	ValueSecret secrets.Secret `yaml:"value_secret,omitempty" json:"value_secret,omitempty" iac:"doc=Sensitive value; MUST be ${env:NAME} or ${sops:path} and is shown as [REDACTED]"`
 }
 
-// Validate enforces ExactlyOneOf{Value, ValueSecret} (cf. secrets-policy.md §3.2).
+// Validate enforces ExactlyOneOf{Value, ValueSecret}.
 func (e EnvVarEntry) Validate() error {
 	if e.Name == "" {
 		return fmt.Errorf("env_var: name is required")

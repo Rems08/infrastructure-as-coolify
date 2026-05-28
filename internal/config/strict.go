@@ -5,9 +5,9 @@ import (
 	"regexp"
 )
 
-// knownSecretPattern matches the canary prefixes of common credential formats
-// (mitigation C-S2.4, threat-model T-S2.4). The alternatives for eyJ/age1 capture the
-// full token so the reported match clearly shows the offending value.
+// knownSecretPattern matches the canary prefixes of common credential formats. The
+// alternatives for eyJ/age1 capture the full token so the reported match clearly shows
+// the offending value.
 var knownSecretPattern = regexp.MustCompile(
 	`ghp_[A-Za-z0-9]{16,}|gho_[A-Za-z0-9]{16,}|ghs_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{10,}|AKIA[A-Z0-9]{12,}|xoxb-[A-Za-z0-9-]{10,}|xoxp-[A-Za-z0-9-]{10,}|eyJ[A-Za-z0-9_-]{10,}|age1[a-z0-9]{20,}`,
 )
@@ -17,7 +17,7 @@ var base64ish = regexp.MustCompile(`^[A-Za-z0-9+/=_\-]+$`)
 
 const (
 	// entropyThreshold is the Shannon entropy (bits/char) above which a sufficiently
-	// long opaque token is treated as secret-like (mitigation C-S2.5, T-S2.5).
+	// long opaque token is treated as secret-like.
 	entropyThreshold = 4.5
 	// minEntropyLen avoids flagging short human-readable values like "production".
 	minEntropyLen = 20

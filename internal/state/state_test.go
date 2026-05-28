@@ -10,9 +10,9 @@ import (
 	"github.com/Rems08/infrastructure-as-coolify/internal/secrets"
 )
 
-// TestStateMarshalRefusesSecretField covers critère §7 #14 (C-L0.4). The real State
-// has no Secret field, so it marshals fine; a struct that DOES carry one must be
-// detected by the same ratchet, proving the guard fires if State ever regresses.
+// TestStateMarshalRefusesSecretField asserts the marshal guard fires if State ever
+// regresses. The real State has no Secret field, so it marshals fine; a struct that
+// DOES carry one must be detected by the same ratchet.
 func TestStateMarshalRefusesSecretField(t *testing.T) {
 	s := &State{
 		UUIDs:       map[string]string{"app/web/staging": "hzw53gga4fcgpsl706h5rgmo"},

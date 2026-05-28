@@ -3,8 +3,6 @@
 // state cache, error wrapping, or any string representation other than
 // "[REDACTED]". The only escape hatch is Reveal(), restricted by an AST ratchet
 // (reveal_lint_test.go) to internal/secrets/ and internal/coolify/.
-//
-// See secrets-policy.md for the full design and threat-model mapping.
 package secrets
 
 import (
@@ -26,7 +24,7 @@ const (
 	SourceUnset Source = iota
 	// SourceEnv marks a Secret sourced from ${env:VAR}.
 	SourceEnv
-	// SourceSOPS marks a Secret sourced from ${sops:path} (Wave 4+).
+	// SourceSOPS marks a Secret sourced from ${sops:path}.
 	SourceSOPS
 )
 
@@ -51,7 +49,7 @@ func NewFromEnv(envName string) (Secret, error) {
 	return Secret{value: v, source: SourceEnv, origin: "${env:" + envName + "}"}, nil
 }
 
-// NewFromSOPS builds a Secret from a SOPS-decrypted value (Wave 4+).
+// NewFromSOPS builds a Secret from a SOPS-decrypted value.
 func NewFromSOPS(decrypted, path string) Secret {
 	return Secret{value: decrypted, source: SourceSOPS, origin: "${sops:" + path + "}"}
 }
@@ -65,8 +63,8 @@ func (s Secret) Reveal() string { return s.value }
 func (s Secret) Origin() string { return s.origin }
 
 // ValueEquals reports whether two secrets hold the same underlying value, without
-// revealing it. The diff engine uses this for Notify-only secret comparison
-// (secrets-policy.md §4.4): it learns a value changed without ever seeing the value.
+// revealing it. The diff engine uses this for Notify-only secret comparison:
+// it learns a value changed without ever seeing the value.
 func (s Secret) ValueEquals(other Secret) bool { return s.value == other.value }
 
 // IsZero reports whether the Secret is unset.

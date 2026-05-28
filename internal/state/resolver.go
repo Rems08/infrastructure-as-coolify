@@ -36,17 +36,32 @@ func (m Map) Lookup(k ResourceKey) (string, bool) {
 	return u, ok
 }
 
+// Has reports whether key was resolved.
+func (m Map) Has(k ResourceKey) bool {
+	_, ok := m[k]
+	return ok
+}
+
+// KindServer is the resolver coordinate for a Coolify server. A server is not a
+// user-declarable resource (iac-coolify never creates one); the resolver maps its name to
+// the UUID an application-create body requires.
+const KindServer = "Server"
+
 // resolverClient is the subset of the Coolify client the resolver needs (accept
 // interfaces, return structs).
 type resolverClient interface {
 	ListProjects(ctx context.Context) ([]coolify.Project, error)
 	ListEnvironments(ctx context.Context, projectUUID string) ([]coolify.Environment, error)
+	ListServers(ctx context.Context) ([]coolify.Server, error)
 	ListApplications(ctx context.Context) ([]coolify.Application, error)
 }
 
-// Resolve builds the logical-key → UUID map from live Coolify state using only documented
-// v4 endpoints (GET /projects, /projects/{uuid}/environments, /applications). It joins
-// each application's environment_id back to its environment and project names.
+// Resolve builds the logical-key → identifier map from live Coolify state using only
+// documented v4 endpoints (GET /projects, /projects/{uuid}/environments, /servers,
+// /applications). The mapped value is whatever the API uses to address the resource: a
+// UUID for projects, servers and applications; the name for environments (which have no
+// UUID and are addressed by environment_name_or_uuid). It joins each application's
+// environment_id back to its environment and project names.
 //
 // Databases and Services are intentionally out of scope: their list responses are
 // undocumented placeholders in the pinned OpenAPI spec (escalation #2), so resolving them
@@ -57,9 +72,11 @@ func Resolve(ctx context.Context, client resolverClient) (Map, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve: list projects: %w", err)
 	}
+	m := make(Map)
 	projectByID := make(map[int]coolify.Project, len(projects))
 	for _, p := range projects {
 		projectByID[p.ID] = p
+		m[ResourceKey{Kind: resource.KindProject, Name: p.Name}] = p.UUID
 	}
 
 	envByID := make(map[int]coolify.Environment)
@@ -70,14 +87,22 @@ func Resolve(ctx context.Context, client resolverClient) (Map, error) {
 		}
 		for _, e := range envs {
 			envByID[e.ID] = e
+			m[ResourceKey{Project: p.Name, Kind: resource.KindEnvironment, Name: e.Name}] = e.Name
 		}
+	}
+
+	servers, err := client.ListServers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("resolve: list servers: %w", err)
+	}
+	for _, s := range servers {
+		m[ResourceKey{Kind: KindServer, Name: s.Name}] = s.UUID
 	}
 
 	apps, err := client.ListApplications(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("resolve: list applications: %w", err)
 	}
-	m := make(Map, len(apps))
 	for _, a := range apps {
 		env, ok := envByID[a.EnvironmentID]
 		if !ok {

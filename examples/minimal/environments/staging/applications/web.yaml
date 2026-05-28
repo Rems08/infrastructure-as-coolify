@@ -1,0 +1,24 @@
+api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: web
+  project: demo
+  environment: staging
+spec:
+  build_pack: dockerimage
+  image:
+    name: registry.example.com/demo/web
+    tag: v1-0-0
+  destination:
+    server: localhost
+    network: coolify
+  fqdn: https://web.example.com
+  port: 3000
+  health_check:
+    enabled: true
+    path: /healthz
+  env_vars:
+    - name: NODE_ENV
+      value: production
+    - name: LOG_LEVEL
+      value: info

@@ -139,6 +139,91 @@ func TestListApplications_RateLimitedRetries(t *testing.T) {
 	}
 }
 
+// cfAccessCapture is a test server that records the CF Access headers it received.
+func cfAccessCapture(t *testing.T, body string) (*httptest.Server, *map[string]string) {
+	t.Helper()
+	seen := map[string]string{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen["CF-Access-Client-Id"] = r.Header.Get("CF-Access-Client-Id")
+		seen["CF-Access-Client-Secret"] = r.Header.Get("CF-Access-Client-Secret")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &seen
+}
+
+// TestCFAccessHeadersPresentWhenConfigured covers critère §7 #26: both CF-Access
+// headers are sent on every request when the client is configured with them, and the
+// secret reaches the wire only via the allowlisted Reveal() boundary.
+func TestCFAccessHeadersPresentWhenConfigured(t *testing.T) {
+	srv, seen := cfAccessCapture(t, "[]")
+
+	t.Setenv("COOLIFY_API_TOKEN", testToken)
+	t.Setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret-DO_NOT_LEAK")
+	tok, err := secrets.NewFromEnv("COOLIFY_API_TOKEN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfSec, err := secrets.NewFromEnv("CF_ACCESS_CLIENT_SECRET")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := coolify.NewClient(coolify.Options{
+		BaseURL:              srv.URL,
+		Token:                tok,
+		CFAccessClientID:     "cf-client-id.access",
+		CFAccessClientSecret: cfSec,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.ListApplications(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if (*seen)["CF-Access-Client-Id"] != "cf-client-id.access" {
+		t.Errorf("CF-Access-Client-Id = %q, want cf-client-id.access", (*seen)["CF-Access-Client-Id"])
+	}
+	if (*seen)["CF-Access-Client-Secret"] != "cf-secret-DO_NOT_LEAK" {
+		t.Errorf("CF-Access-Client-Secret header not sent correctly")
+	}
+}
+
+// TestCFAccessHeadersAbsentWhenEmpty covers critère §7 #26: no CF Access headers leak
+// onto requests for a client configured without them.
+func TestCFAccessHeadersAbsentWhenEmpty(t *testing.T) {
+	srv, seen := cfAccessCapture(t, "[]")
+	if _, err := newTestClient(t, srv.URL).ListApplications(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if (*seen)["CF-Access-Client-Id"] != "" || (*seen)["CF-Access-Client-Secret"] != "" {
+		t.Errorf("CF Access headers present on an unconfigured client: %+v", *seen)
+	}
+}
+
+// TestNewClient_CFAccessHalfConfigured rejects a partial CF Access pair at construction.
+func TestNewClient_CFAccessHalfConfigured(t *testing.T) {
+	t.Setenv("COOLIFY_API_TOKEN", testToken)
+	t.Setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
+	tok, err := secrets.NewFromEnv("COOLIFY_API_TOKEN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfSec, err := secrets.NewFromEnv("CF_ACCESS_CLIENT_SECRET")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []coolify.Options{
+		{BaseURL: "https://x", Token: tok, CFAccessClientID: "id-only"},
+		{BaseURL: "https://x", Token: tok, CFAccessClientSecret: cfSec},
+	}
+	for i, opts := range cases {
+		if _, err := coolify.NewClient(opts); err == nil {
+			t.Errorf("case %d: want error on half-configured CF Access", i)
+		}
+	}
+}
+
 // TestOpenAPIChecksumVerifiedOnBoot covers critère §7 #19 (C-S7.3).
 func TestOpenAPIChecksumVerifiedOnBoot(t *testing.T) {
 	specPath := filepath.Join("..", "..", "testdata", "openapi", "coolify-v4.yaml")

@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Rems08/infrastructure-as-coolify/internal/resource/application",
+  "$ref": "#/$defs/Application",
+  "$defs": {
+    "Application": {
+      "properties": {
+        "api_version": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/ApplicationMeta"
+        },
+        "spec": {
+          "$ref": "#/$defs/ApplicationSpec"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "api_version",
+        "kind",
+        "metadata",
+        "spec"
+      ]
+    },
+    "ApplicationMeta": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "project",
+        "environment"
+      ]
+    },
+    "ApplicationSpec": {
+      "properties": {
+        "build_pack": {
+          "type": "string"
+        },
+        "image": {
+          "$ref": "#/$defs/ImageSpec"
+        },
+        "destination": {
+          "$ref": "#/$defs/DestinationRef"
+        },
+        "fqdn": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "health_check": {
+          "$ref": "#/$defs/HealthCheckSpec"
+        },
+        "limits": {
+          "$ref": "#/$defs/LimitsSpec"
+        },
+        "preview": {
+          "$ref": "#/$defs/PreviewSpec"
+        },
+        "env_vars": {
+          "items": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "build_pack",
+        "destination",
+        "port"
+      ]
+    },
+    "DestinationRef": {
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "network": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "server",
+        "network"
+      ]
+    },
+    "EnvVar": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "value_secret": {
+          "type": "string",
+          "pattern": "^\\$\\{(env|sops):[^}]+\\}$"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "HealthCheckSpec": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "ImageSpec": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "tag"
+      ]
+    },
+    "LimitsSpec": {
+      "properties": {
+        "cpu_shares": {
+          "type": "integer"
+        },
+        "memory": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PreviewSpec": {
+      "properties": {
+        "url_template": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    }
+  }
+}

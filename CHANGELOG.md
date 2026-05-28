@@ -6,7 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased] - 2026-05-28
 
-### Added
+### Added (Wave 2)
+
+- `iac-coolify plan`: Terraform-style per-field diff between the desired YAML and live
+  Coolify state, with `--output=text|json` (auto-detecting TTY/CI), `--detailed-exitcode`
+  (`0`/`2`/`1`), and an offline mode (all resources treated as new) when no Coolify
+  URL/token is configured.
+- Semantic diff engine (`internal/plan`) with Notify-only secret handling: a secret value
+  change is announced without ever exposing the value, hash, or any partial.
+- Live UUID resolver (`internal/state`): maps logical `(project, environment, kind, name)`
+  keys to Coolify UUIDs via the documented `GET /projects`, `/projects/{uuid}/environments`
+  and `/applications` endpoints, with an opt-in `--state-cache` JSON file.
+- `Database` resource (8 engines: postgresql, mysql, mariadb, mongodb, redis, keydb,
+  dragonfly, clickhouse) and a standalone `EnvVar` resource referenced by an Application
+  through `env_vars_from`. `validate` and `docs gen` are now multi-resource aware.
+- Cloudflare Access support: `CF-Access-Client-Id` / `CF-Access-Client-Secret` headers on
+  every request, the secret typed as `Secret` and revealed only at the header boundary.
+- OpenAPI checksum verification wired into `plan` boot (refuses a tampered pinned spec,
+  tolerates its absence outside the repo).
+
+### Added (Wave 1)
 
 - Repository scaffold: Go module, `internal/` layout, Apache-2.0 license and OSS docs
   (`README`, `CONTRIBUTING`, `CODE_OF_CONDUCT`, `SECURITY`).

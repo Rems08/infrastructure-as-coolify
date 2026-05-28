@@ -4,10 +4,12 @@
 package coolify
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -84,20 +86,59 @@ func NewClient(opts Options) (*Client, error) {
 }
 
 // newRequest builds a GET request to path (relative to /api/v1) with the auth and CF
-// Access headers applied. It is the single place Secret.Reveal() is called — exactly at
-// the HTTP boundary, never earlier (allowlisted by internal/secrets/reveal_lint_test.go).
+// Access headers applied.
 func (c *Client) newRequest(ctx context.Context, path string) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/v1"+path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("coolify: build request: %w", err)
 	}
+	c.setAuthHeaders(req)
+	return req, nil
+}
+
+// newWriteRequest builds a mutating request (POST/PATCH/DELETE) to path. A non-nil body is
+// JSON-encoded. Every write carries an Idempotency-Key derived from the method, path and
+// body, so a CI retry of the identical operation cannot create a duplicate resource.
+func (c *Client) newWriteRequest(ctx context.Context, method, path string, body any) (*http.Request, error) {
+	var encoded []byte
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("coolify: marshal %s %s body: %w", method, path, err)
+		}
+		encoded = b
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+"/api/v1"+path, bytes.NewReader(encoded))
+	if err != nil {
+		return nil, fmt.Errorf("coolify: build request: %w", err)
+	}
+	c.setAuthHeaders(req)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set("Idempotency-Key", idempotencyKey(method, path, encoded))
+	return req, nil
+}
+
+// setAuthHeaders applies the Bearer token and optional CF Access headers. It is the single
+// place Secret.Reveal() is called — exactly at the HTTP boundary, never earlier
+// (allowlisted by internal/secrets/reveal_lint_test.go).
+func (c *Client) setAuthHeaders(req *http.Request) {
 	req.Header.Set("Authorization", "Bearer "+c.token.Reveal())
 	req.Header.Set("Accept", "application/json")
 	if c.cfAccessClientID != "" {
 		req.Header.Set("CF-Access-Client-Id", c.cfAccessClientID)
 		req.Header.Set("CF-Access-Client-Secret", c.cfAccessClientSecret.Reveal())
 	}
-	return req, nil
+}
+
+// idempotencyKey is sha256(method + path + body): deterministic for an identical operation
+// so retries reuse the key, distinct when the target or payload differs.
+func idempotencyKey(method, path string, body []byte) string {
+	h := sha256.New()
+	h.Write([]byte(method + " " + path + "\n"))
+	h.Write(body)
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // getJSON performs req and decodes a 2xx JSON body into dst. label names the call in
@@ -158,6 +199,20 @@ func (c *Client) ListEnvironments(ctx context.Context, projectUUID string) ([]En
 	return envs, nil
 }
 
+// ListServers fetches all servers via GET /api/v1/servers. The resolver uses it to map a
+// logical destination server name to the UUID required when creating an application.
+func (c *Client) ListServers(ctx context.Context) ([]Server, error) {
+	req, err := c.newRequest(ctx, "/servers")
+	if err != nil {
+		return nil, err
+	}
+	var servers []Server
+	if err := c.getJSON(req, &servers, "GET servers"); err != nil {
+		return nil, err
+	}
+	return servers, nil
+}
+
 // GetApplication fetches a single application by UUID via GET /api/v1/applications/{uuid}.
 // It is the documented endpoint used to read remote state for the plan diff.
 func (c *Client) GetApplication(ctx context.Context, uuid string) (Application, error) {
@@ -170,6 +225,133 @@ func (c *Client) GetApplication(ctx context.Context, uuid string) (Application, 
 		return app, err
 	}
 	return app, nil
+}
+
+// doJSON performs a mutating req, treating any 2xx as success. When dst is non-nil the
+// response body is decoded into it; a nil dst discards the body (e.g. delete). A non-2xx
+// response becomes an *APIError.
+func (c *Client) doJSON(req *http.Request, dst any, label string) error {
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("coolify: %s: %w", label, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return newAPIError(resp)
+	}
+	if dst == nil {
+		return nil
+	}
+	if err := json.NewDecoder(resp.Body).Decode(dst); err != nil {
+		return fmt.Errorf("coolify: decode %s: %w", label, err)
+	}
+	return nil
+}
+
+// applicationCreateBody is the wire body for a create: the request fields plus the
+// build_pack the chosen endpoint expects. The embedded BuildPack is json:"-", so the
+// outer build_pack field is the only one serialised.
+type applicationCreateBody struct {
+	CreateApplicationRequest
+	BuildPack string `json:"build_pack,omitempty"`
+}
+
+// CreateApplication creates an application, selecting the POST endpoint and body
+// build_pack from req.BuildPack. It returns the new application's UUID.
+func (c *Client) CreateApplication(ctx context.Context, req CreateApplicationRequest) (string, error) {
+	endpoint, apiBuildPack, err := ApplicationCreateEndpoint(req.BuildPack)
+	if err != nil {
+		return "", err
+	}
+	if vErr := validateCreatable(req); vErr != nil {
+		return "", vErr
+	}
+	body := applicationCreateBody{CreateApplicationRequest: req, BuildPack: apiBuildPack}
+	httpReq, err := c.newWriteRequest(ctx, http.MethodPost, endpoint, body)
+	if err != nil {
+		return "", err
+	}
+	var out CreateResponse
+	if err := c.doJSON(httpReq, &out, "POST "+endpoint); err != nil {
+		return "", err
+	}
+	return out.UUID, nil
+}
+
+// UpdateApplication patches the non-empty fields of req onto the application identified by
+// uuid via PATCH /applications/{uuid}.
+func (c *Client) UpdateApplication(ctx context.Context, uuid string, req UpdateApplicationRequest) error {
+	httpReq, err := c.newWriteRequest(ctx, http.MethodPatch, "/applications/"+uuid, req)
+	if err != nil {
+		return err
+	}
+	return c.doJSON(httpReq, nil, "PATCH application "+uuid)
+}
+
+// DeleteApplication deletes the application identified by uuid. A 404 is treated as
+// success so a repeated destroy is a no-op.
+func (c *Client) DeleteApplication(ctx context.Context, uuid string) error {
+	httpReq, err := c.newWriteRequest(ctx, http.MethodDelete, "/applications/"+uuid, nil)
+	if err != nil {
+		return err
+	}
+	return ignoreNotFound(c.doJSON(httpReq, nil, "DELETE application "+uuid))
+}
+
+// CreateProject creates a project via POST /projects and returns its UUID.
+func (c *Client) CreateProject(ctx context.Context, req CreateProjectRequest) (string, error) {
+	httpReq, err := c.newWriteRequest(ctx, http.MethodPost, "/projects", req)
+	if err != nil {
+		return "", err
+	}
+	var out CreateResponse
+	if err := c.doJSON(httpReq, &out, "POST projects"); err != nil {
+		return "", err
+	}
+	return out.UUID, nil
+}
+
+// DeleteProject deletes the project identified by uuid. A 404 is treated as success.
+func (c *Client) DeleteProject(ctx context.Context, uuid string) error {
+	httpReq, err := c.newWriteRequest(ctx, http.MethodDelete, "/projects/"+uuid, nil)
+	if err != nil {
+		return err
+	}
+	return ignoreNotFound(c.doJSON(httpReq, nil, "DELETE project "+uuid))
+}
+
+// CreateEnvironment creates an environment in the project identified by projectUUID via
+// POST /projects/{uuid}/environments and returns its UUID.
+func (c *Client) CreateEnvironment(ctx context.Context, projectUUID string, req CreateEnvironmentRequest) (string, error) {
+	httpReq, err := c.newWriteRequest(ctx, http.MethodPost, "/projects/"+projectUUID+"/environments", req)
+	if err != nil {
+		return "", err
+	}
+	var out CreateResponse
+	if err := c.doJSON(httpReq, &out, "POST environments "+projectUUID); err != nil {
+		return "", err
+	}
+	return out.UUID, nil
+}
+
+// DeleteEnvironment deletes an environment by name (or UUID) from the project identified
+// by projectUUID. A 404 is treated as success.
+func (c *Client) DeleteEnvironment(ctx context.Context, projectUUID, envNameOrUUID string) error {
+	httpReq, err := c.newWriteRequest(ctx, http.MethodDelete, "/projects/"+projectUUID+"/environments/"+envNameOrUUID, nil)
+	if err != nil {
+		return err
+	}
+	return ignoreNotFound(c.doJSON(httpReq, nil, "DELETE environment "+envNameOrUUID))
+}
+
+// ignoreNotFound maps a 404 *APIError to nil so a delete of an already-absent resource is
+// a silent no-op (idempotent destroy).
+func ignoreNotFound(err error) error {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	return err
 }
 
 // OpenAPIChecksum returns the pinned spec sha256, recorded in the state cache so a later

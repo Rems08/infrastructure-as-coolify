@@ -30,9 +30,62 @@ type Project struct {
 }
 
 // Environment mirrors components.schemas.Environment. ProjectID links it back to a
-// Project.ID; ID links an Application/Database back to its environment.
+// Project.ID; ID links an Application/Database back to its environment. The schema has
+// no UUID: the API addresses an environment by name (environment_name_or_uuid).
 type Environment struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
 	ProjectID int    `json:"project_id"`
+}
+
+// Server mirrors the subset of components.schemas.Server the resolver needs to map a
+// logical destination server name to the UUID required by the application-create body.
+type Server struct {
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
+}
+
+// CreateResponse is the shared 201 body of the create endpoints: a single uuid.
+type CreateResponse struct {
+	UUID string `json:"uuid"`
+}
+
+// CreateApplicationRequest is the body sent to one of the POST /applications/* endpoints.
+// BuildPack carries the iac-coolify build_pack value (not the upstream enum); the client
+// selects the endpoint and the body's build_pack from it (see buildpack.go). Fields are
+// a superset of all create variants; omitempty keeps each request to the fields the
+// chosen variant uses.
+type CreateApplicationRequest struct {
+	BuildPack               string `json:"-"` // selects endpoint; never serialised directly
+	ProjectUUID             string `json:"project_uuid"`
+	ServerUUID              string `json:"server_uuid"`
+	EnvironmentName         string `json:"environment_name,omitempty"`
+	Name                    string `json:"name,omitempty"`
+	Domains                 string `json:"domains,omitempty"`
+	PortsExposes            string `json:"ports_exposes,omitempty"`
+	DockerRegistryImageName string `json:"docker_registry_image_name,omitempty"`
+	DockerRegistryImageTag  string `json:"docker_registry_image_tag,omitempty"`
+	GitRepository           string `json:"git_repository,omitempty"`
+	GitBranch               string `json:"git_branch,omitempty"`
+	Dockerfile              string `json:"dockerfile,omitempty"`
+}
+
+// UpdateApplicationRequest is the partial body sent to PATCH /applications/{uuid}. Only
+// the non-empty fields are sent, so the engine can update just what the diff changed.
+type UpdateApplicationRequest struct {
+	Domains                 string `json:"domains,omitempty"`
+	PortsExposes            string `json:"ports_exposes,omitempty"`
+	DockerRegistryImageName string `json:"docker_registry_image_name,omitempty"`
+	DockerRegistryImageTag  string `json:"docker_registry_image_tag,omitempty"`
+}
+
+// CreateProjectRequest is the body sent to POST /projects.
+type CreateProjectRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
+// CreateEnvironmentRequest is the body sent to POST /projects/{uuid}/environments.
+type CreateEnvironmentRequest struct {
+	Name string `json:"name"`
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/goccy/go-yaml"
 
@@ -77,6 +78,86 @@ func LoadEnvironment(path string) (resource.Environment, error) {
 		return e, err
 	}
 	return e, nil
+}
+
+// LoadService parses a YAML file into a Service with strict decoding, resolving
+// ${env:VAR} interpolation in visible env-var values. It does not read the referenced
+// compose file; LoadServices does, after the path-traversal check.
+func LoadService(path string) (resource.Service, error) {
+	var s resource.Service
+	if err := loadStrict(path, &s); err != nil {
+		return s, err
+	}
+	if err := interpolateEntries(s.Spec.EnvVars); err != nil {
+		return s, fmt.Errorf("%s: %w", path, err)
+	}
+	return s, nil
+}
+
+// LoadedService pairs a validated Service with its resolved compose content. ComposeRaw is
+// the decoded docker-compose file for a compose_path service, or "" for a one-click
+// (type) service.
+type LoadedService struct {
+	Service    resource.Service
+	ComposeRaw string
+}
+
+// LoadServices loads and validates every Service under target (a file or a directory),
+// reading the referenced compose file only after its path passes the traversal check
+// (confined to target). Non-Service resources are skipped. It returns the first error
+// found.
+func LoadServices(target string) ([]LoadedService, error) {
+	files, err := collectFiles(target)
+	if err != nil {
+		return nil, err
+	}
+	root := composeRoot(target)
+	var out []LoadedService
+	for _, kf := range files {
+		if kf.kind != resource.KindService {
+			continue
+		}
+		svc, lErr := LoadService(kf.path)
+		if lErr != nil {
+			return nil, lErr
+		}
+		if vErr := svc.Validate(); vErr != nil {
+			return nil, fmt.Errorf("%s: %w", kf.path, vErr)
+		}
+		raw, cErr := resolveCompose(root, kf.path, svc)
+		if cErr != nil {
+			return nil, cErr
+		}
+		out = append(out, LoadedService{Service: svc, ComposeRaw: raw})
+	}
+	return out, nil
+}
+
+// composeRoot returns the directory that bounds docker_compose_path resolution: the target
+// directory itself, or the directory holding a single target file.
+func composeRoot(target string) string {
+	if info, err := os.Stat(target); err == nil && info.IsDir() {
+		return target
+	}
+	return filepath.Dir(target)
+}
+
+// resolveCompose validates a compose_path against root and reads its content. It returns
+// "" for a one-click (type) service, which has no local file.
+func resolveCompose(root, path string, svc resource.Service) (string, error) {
+	if !svc.Spec.HasComposePath() {
+		return "", nil
+	}
+	baseDir := filepath.Dir(path)
+	rel := svc.Spec.DockerComposePath
+	if err := resource.ValidateComposePath(root, baseDir, rel); err != nil {
+		return "", fmt.Errorf("%s: %w", path, err)
+	}
+	data, err := os.ReadFile(filepath.Join(baseDir, rel))
+	if err != nil {
+		return "", fmt.Errorf("%s: read compose file: %w", path, err)
+	}
+	return string(data), nil
 }
 
 // LoadApplications loads and validates every Application under target (a file or a

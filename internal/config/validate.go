@@ -24,6 +24,7 @@ type Report struct {
 	Projects     []string
 	Environments []string
 	Apps         []string
+	Services     []string
 	Databases    []string
 	EnvVars      []string
 	Issues       []Issue
@@ -48,12 +49,14 @@ func Validate(target string, strict bool) (Report, error) {
 		return Report{}, err
 	}
 	var rep Report
+	root := composeRoot(target)
 	for _, f := range files {
-		validateFile(f, strict, &rep)
+		validateFile(f, strict, root, &rep)
 	}
 	sort.Strings(rep.Projects)
 	sort.Strings(rep.Environments)
 	sort.Strings(rep.Apps)
+	sort.Strings(rep.Services)
 	sort.Strings(rep.Databases)
 	sort.Strings(rep.EnvVars)
 	return rep, nil
@@ -93,7 +96,8 @@ func collectFiles(target string) ([]kindFile, error) {
 func isKnownKind(kind string) bool {
 	switch kind {
 	case resource.KindProject, resource.KindEnvironment,
-		resource.KindApplication, resource.KindDatabase, resource.KindEnvVar:
+		resource.KindApplication, resource.KindService,
+		resource.KindDatabase, resource.KindEnvVar:
 		return true
 	default:
 		return false
@@ -105,7 +109,7 @@ func isYAML(path string) bool {
 	return ext == ".yaml" || ext == ".yml"
 }
 
-func validateFile(kf kindFile, strict bool, rep *Report) {
+func validateFile(kf kindFile, strict bool, root string, rep *Report) {
 	switch kf.kind {
 	case resource.KindProject:
 		validateProject(kf.path, rep)
@@ -113,6 +117,8 @@ func validateFile(kf kindFile, strict bool, rep *Report) {
 		validateEnvironment(kf.path, rep)
 	case resource.KindApplication:
 		validateApplication(kf.path, strict, rep)
+	case resource.KindService:
+		validateService(kf.path, root, rep)
 	case resource.KindDatabase:
 		validateDatabase(kf.path, rep)
 	case resource.KindEnvVar:
@@ -165,6 +171,25 @@ func validateApplication(path string, strict bool, rep *Report) {
 		scanStrict(path, app.Spec.EnvVars, rep)
 	}
 	rep.Apps = append(rep.Apps, app.Metadata.Name)
+}
+
+func validateService(path, root string, rep *Report) {
+	svc, err := LoadService(path)
+	if err != nil {
+		rep.Issues = append(rep.Issues, Issue{File: path, Message: err.Error()})
+		return
+	}
+	if err := svc.Validate(); err != nil {
+		rep.Issues = append(rep.Issues, Issue{File: path, Message: err.Error()})
+		return
+	}
+	if svc.Spec.HasComposePath() {
+		if err := resource.ValidateComposePath(root, filepath.Dir(path), svc.Spec.DockerComposePath); err != nil {
+			rep.Issues = append(rep.Issues, Issue{File: path, Message: err.Error()})
+			return
+		}
+	}
+	rep.Services = append(rep.Services, svc.Metadata.Name)
 }
 
 func validateDatabase(path string, rep *Report) {
@@ -238,6 +263,7 @@ func summaryLine(rep Report) string {
 		{"project", rep.Projects},
 		{"environment", rep.Environments},
 		{"application", rep.Apps},
+		{"service", rep.Services},
 		{"database", rep.Databases},
 		{"envvar", rep.EnvVars},
 	}

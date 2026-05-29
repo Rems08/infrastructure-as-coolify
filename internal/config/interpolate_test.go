@@ -3,6 +3,8 @@ package config
 import (
 	"strconv"
 	"testing"
+
+	"github.com/Rems08/infrastructure-as-coolify/internal/resource"
 )
 
 func TestResolveEnvInterpolation(t *testing.T) {
@@ -68,6 +70,87 @@ func TestResolveEnvInterpolation(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestInterpolationGenericParamFields asserts ${env:VAR} is resolved across every visible
+// (Param) string field of an application — metadata, image, fqdn, source, destination,
+// dockerfile, limits — and that an unset reference errors.
+func TestInterpolationGenericParamFields(t *testing.T) {
+	full := func() *resource.Application {
+		return &resource.Application{
+			Metadata: resource.ApplicationMeta{Name: "${env:NAME}", Project: "${env:PROJ}", Environment: "${env:ENVN}"},
+			Spec: resource.ApplicationSpec{
+				Image:       &resource.ImageSpec{Name: "${env:IMG}", Tag: "${env:TAG}"},
+				FQDN:        "https://${env:HOST}:${env:PORT}",
+				Dockerfile:  "FROM ${env:BASE}",
+				Source:      &resource.SourceSpec{GitRepository: "${env:REPO}", GitBranch: "${env:BRANCH}", PortsExposes: "${env:EXPOSE}"},
+				Destination: resource.DestinationRef{Server: "${env:SRV}", Network: "${env:NET}"},
+				Limits:      &resource.LimitsSpec{Memory: "${env:MEM}"},
+			},
+		}
+	}
+	env := map[string]string{
+		"NAME": "api", "PROJ": "beenaire", "ENVN": "staging",
+		"IMG": "registry/api", "TAG": "v1", "HOST": "api.example.com", "PORT": "443",
+		"BASE": "busybox", "REPO": "https://github.com/acme/app", "BRANCH": "main",
+		"EXPOSE": "3000", "SRV": "localhost", "NET": "coolify", "MEM": "512m",
+	}
+
+	tests := []struct {
+		name string
+		get  func(*resource.Application) string
+		want string
+	}{
+		{"metadata.name", func(a *resource.Application) string { return a.Metadata.Name }, "api"},
+		{"metadata.project", func(a *resource.Application) string { return a.Metadata.Project }, "beenaire"},
+		{"metadata.environment", func(a *resource.Application) string { return a.Metadata.Environment }, "staging"},
+		{"image.name", func(a *resource.Application) string { return a.Spec.Image.Name }, "registry/api"},
+		{"image.tag", func(a *resource.Application) string { return a.Spec.Image.Tag }, "v1"},
+		{"fqdn multi-ref", func(a *resource.Application) string { return a.Spec.FQDN }, "https://api.example.com:443"},
+		{"dockerfile", func(a *resource.Application) string { return a.Spec.Dockerfile }, "FROM busybox"},
+		{"source.git_repository", func(a *resource.Application) string { return a.Spec.Source.GitRepository }, "https://github.com/acme/app"},
+		{"source.git_branch", func(a *resource.Application) string { return a.Spec.Source.GitBranch }, "main"},
+		{"source.ports_exposes", func(a *resource.Application) string { return a.Spec.Source.PortsExposes }, "3000"},
+		{"destination.server", func(a *resource.Application) string { return a.Spec.Destination.Server }, "localhost"},
+		{"destination.network", func(a *resource.Application) string { return a.Spec.Destination.Network }, "coolify"},
+		{"limits.memory", func(a *resource.Application) string { return a.Spec.Limits.Memory }, "512m"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range env {
+				t.Setenv(k, v)
+			}
+			app := full()
+			if err := interpolateApplicationFields(app); err != nil {
+				t.Fatalf("interpolateApplicationFields: %v", err)
+			}
+			if got := tt.get(app); got != tt.want {
+				t.Errorf("%s = %q, want %q", tt.name, got, tt.want)
+			}
+		})
+	}
+
+	t.Run("unset reference errors", func(t *testing.T) {
+		app := &resource.Application{Metadata: resource.ApplicationMeta{Name: "${env:DEFINITELY_UNSET_W4}"}}
+		if err := interpolateApplicationFields(app); err == nil {
+			t.Fatal("expected an error for an unset env reference")
+		}
+	})
+
+	t.Run("service fields resolved", func(t *testing.T) {
+		t.Setenv("SVC_NAME", "grafana")
+		t.Setenv("SVC_TYPE", "grafana")
+		svc := &resource.Service{
+			Metadata: resource.ServiceMeta{Name: "${env:SVC_NAME}"},
+			Spec:     resource.ServiceSpec{Type: "${env:SVC_TYPE}"},
+		}
+		if err := interpolateServiceFields(svc); err != nil {
+			t.Fatal(err)
+		}
+		if svc.Metadata.Name != "grafana" || svc.Spec.Type != "grafana" {
+			t.Errorf("service fields not resolved: %+v", svc)
+		}
+	})
 }
 
 // TestResolveEnvInterpolation_IntCast verifies the downstream int-parse contract:

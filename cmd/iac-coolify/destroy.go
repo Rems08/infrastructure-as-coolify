@@ -151,12 +151,17 @@ func loadDeleteInput(cmd *cobra.Command, opts destroyOptions, resolved state.Map
 	if err != nil {
 		return apply.DeleteInput{}, err
 	}
-	if err := validateSelection(cmd, opts.only, opts.envFilter, opts.target, projects, envs, apps, loaded); err != nil {
+	dbs, err := config.LoadDatabases(opts.target)
+	if err != nil {
+		return apply.DeleteInput{}, err
+	}
+	if err := validateSelection(cmd, opts.only, opts.envFilter, opts.target, projects, envs, apps, loaded, dbs); err != nil {
 		return apply.DeleteInput{}, err
 	}
 	envs = filterByEnv(envs, opts.envFilter, func(e resource.Environment) string { return e.Metadata.Name })
 	apps = filterByEnv(apps, opts.envFilter, func(a resource.Application) string { return a.Metadata.Environment })
 	loaded = filterByEnv(loaded, opts.envFilter, func(ls config.LoadedService) string { return ls.Service.Metadata.Environment })
+	dbs = filterByEnv(dbs, opts.envFilter, func(d resource.Database) string { return d.Metadata.Environment })
 	services := make([]resource.Service, 0, len(loaded))
 	for _, ls := range loaded {
 		services = append(services, ls.Service)
@@ -166,6 +171,7 @@ func loadDeleteInput(cmd *cobra.Command, opts destroyOptions, resolved state.Map
 		Environments:  envs,
 		Applications:  apps,
 		Services:      services,
+		Databases:     dbs,
 		Resolved:      resolved,
 		Only:          opts.only,
 		AssumePresent: assumePresent,

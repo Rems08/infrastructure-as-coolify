@@ -32,6 +32,31 @@ func TestApplyCommand_DryRunOffline(t *testing.T) {
 	}
 }
 
+func TestApplyCommand_DryRunBuildsServiceOp(t *testing.T) {
+	clearCoolifyEnv(t)
+	t.Setenv("GRAFANA_ADMIN_PASSWORD", "from-env")
+	fullStack := filepath.Join("..", "..", "examples", "full-stack")
+	out, err := runCmd(t, "apply", fullStack, "--dry-run", "--output=json")
+	if err != nil {
+		t.Fatalf("dry-run apply: %v (out: %s)", err, out)
+	}
+	var got struct {
+		ToAdd      int      `json:"to_add"`
+		Operations []string `json:"operations"`
+	}
+	if jErr := json.Unmarshal([]byte(out), &got); jErr != nil {
+		t.Fatalf("parse json: %v\n%s", jErr, out)
+	}
+	// project + environment + service, ordered so the service comes last.
+	if got.ToAdd != 3 {
+		t.Errorf("to_add = %d, want 3 (project+environment+service)", got.ToAdd)
+	}
+	last := got.Operations[len(got.Operations)-1]
+	if !strings.Contains(last, "Service/beenaire/production/observability-stack") {
+		t.Errorf("last op = %q, want the Service ordered after its project and environment", last)
+	}
+}
+
 func TestApplyCommand_NonInteractiveRefuses(t *testing.T) {
 	clearCoolifyEnv(t)
 	_, err := runCmd(t, "apply", fullProjectDir(), "--output=json")
@@ -67,6 +92,8 @@ func applyMux(t *testing.T, failPath string) (*httptest.Server, *[]string) {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/servers":
 			_, _ = w.Write([]byte(`[{"uuid":"srv-uuid","name":"localhost"}]`))
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/applications":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/services":
 			_, _ = w.Write([]byte(`[]`))
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/projects":
 			_, _ = w.Write([]byte(`{"uuid":"proj-uuid"}`))

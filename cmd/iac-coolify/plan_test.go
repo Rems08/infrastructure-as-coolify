@@ -66,6 +66,7 @@ func coolifyMux(t *testing.T, fqdn string) *httptest.Server {
 		"/api/v1/servers":                  `[{"uuid":"srv-1","name":"localhost"}]`,
 		"/api/v1/applications":             `[` + app + `]`,
 		"/api/v1/applications/u-web":       app,
+		"/api/v1/services":                 `[]`,
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, ok := bodies[r.URL.Path]

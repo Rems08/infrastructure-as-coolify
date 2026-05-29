@@ -149,32 +149,69 @@ func buildOperations(ctx context.Context, client *coolify.Client, resolved state
 	if err != nil {
 		return nil, err
 	}
+	services, err := config.LoadServices(opts.target)
+	if err != nil {
+		return nil, err
+	}
 
+	ops := projectEnvOps(projects, envs, resolved, opts.only)
+	appOps, err := applicationOps(ctx, client, resolved, apps, opts.only)
+	if err != nil {
+		return nil, err
+	}
+	ops = append(ops, appOps...)
+	return append(ops, serviceOps(services, resolved, opts.only)...), nil
+}
+
+// projectEnvOps returns the create operations for projects and environments not yet
+// present remotely.
+func projectEnvOps(projects []resource.Project, envs []resource.Environment, resolved state.Map, only string) []apply.Operation {
 	var ops []apply.Operation
 	for _, p := range projects {
-		if selected(opts.only, p.Metadata.Name) && !resolved.Has(state.ResourceKey{Kind: resource.KindProject, Name: p.Metadata.Name}) {
+		if selected(only, p.Metadata.Name) && !resolved.Has(state.ResourceKey{Kind: resource.KindProject, Name: p.Metadata.Name}) {
 			ops = append(ops, apply.CreateProjectOp(p))
 		}
 	}
 	for _, e := range envs {
 		key := state.ResourceKey{Project: e.Metadata.Project, Kind: resource.KindEnvironment, Name: e.Metadata.Name}
-		if selected(opts.only, e.Metadata.Name) && !resolved.Has(key) {
+		if selected(only, e.Metadata.Name) && !resolved.Has(key) {
 			ops = append(ops, apply.CreateEnvironmentOp(e))
 		}
 	}
+	return ops
+}
+
+// applicationOps diffs each application against its live state and returns the operations
+// needed to converge the ones that differ.
+func applicationOps(ctx context.Context, client *coolify.Client, resolved state.Map, apps []resource.Application, only string) ([]apply.Operation, error) {
+	var ops []apply.Operation
 	for _, app := range apps {
-		if !selected(opts.only, app.Metadata.Name) {
+		if !selected(only, app.Metadata.Name) {
 			continue
 		}
-		op, change, aErr := applicationOp(ctx, client, resolved, app)
-		if aErr != nil {
-			return nil, aErr
+		op, change, err := applicationOp(ctx, client, resolved, app)
+		if err != nil {
+			return nil, err
 		}
 		if change {
 			ops = append(ops, op)
 		}
 	}
 	return ops, nil
+}
+
+// serviceOps returns the create operations for services not yet present remotely. Services
+// have no field-level diff yet, so an already-resolved service is left untouched.
+func serviceOps(services []config.LoadedService, resolved state.Map, only string) []apply.Operation {
+	var ops []apply.Operation
+	for _, ls := range services {
+		m := ls.Service.Metadata
+		key := state.ResourceKey{Project: m.Project, Environment: m.Environment, Kind: resource.KindService, Name: m.Name}
+		if selected(only, m.Name) && !resolved.Has(key) {
+			ops = append(ops, apply.ServiceOp(apply.OpCreate, ls.Service, ls.ComposeRaw, nil))
+		}
+	}
+	return ops
 }
 
 // applicationOp diffs an application against its live state and returns the operation to

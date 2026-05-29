@@ -43,6 +43,9 @@ dist/
 bin/
 /iac-coolify
 
+# mdBook render output
+book/
+
 # Test coverage outputs
 cover.out
 coverage.html

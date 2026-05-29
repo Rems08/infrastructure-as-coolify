@@ -1,0 +1,11 @@
+[
+  { "id": 4, "uuid": "ywaorac45d2gu32jzty78qyu", "name": "Beenaire DOC", "type": "application", "created_at": "2026-03-25T10:58:28.000000Z", "updated_at": "2026-05-29T10:23:04.000000Z", "status": "running:unknown" },
+  { "id": 8, "uuid": "v1z7p0ychbvgmno4ae0w7xvb", "name": "restaurant-core-api-staging", "type": "application", "created_at": "2026-04-27T07:23:46.000000Z", "updated_at": "2026-05-29T10:23:04.000000Z", "status": "running:healthy" },
+  { "id": 7, "uuid": "hzw53gga4fcgpsl706h5rgmo", "name": "Beenaire Back Office", "type": "application", "created_at": "2026-04-07T10:39:55.000000Z", "updated_at": "2026-05-29T10:23:04.000000Z", "status": "running:unknown" },
+  { "id": 3, "uuid": "t50fefd4yb1salodq9bipiw3", "name": "pg-restaurant-core-api-staging", "type": "standalone-postgresql", "created_at": "2026-04-27T07:55:41.000000Z", "updated_at": "2026-05-29T10:23:04.000000Z", "status": "running:healthy" },
+  { "id": 2, "uuid": "dpzndbf9fgt7uqyoucwt8986", "name": "pg-restaurant-core-api", "type": "standalone-postgresql", "created_at": "2026-03-25T07:59:39.000000Z", "updated_at": "2026-05-29T10:23:04.000000Z", "status": "running:healthy" },
+  { "id": 2, "uuid": "dj50mi6c35is4cjh7x52ww43", "name": "redis-database-restaurant-core-api-staging", "type": "standalone-redis", "created_at": "2026-04-27T08:04:11.000000Z", "updated_at": "2026-05-29T10:23:04.000000Z", "status": "running:healthy" },
+  { "id": 1, "uuid": "oqsk32s77rp7svh6r8cgmkw9", "name": "redis-database-restaurant-core-api", "type": "standalone-redis", "created_at": "2026-03-24T18:48:58.000000Z", "updated_at": "2026-05-29T10:23:04.000000Z", "status": "running:healthy" },
+  { "id": 1, "uuid": "nr2xvzi8aivw1lmg8a2mj933", "name": "kafka-restaurant-core-api", "type": "service", "created_at": "2026-03-24T19:14:15.000000Z", "updated_at": "2026-03-25T08:18:44.000000Z", "status": "running:healthy" },
+  { "id": 2, "uuid": "ci21h7s7bbn5ujbyttxn2b2t", "name": "restaurant-core-api-workers", "type": "service", "created_at": "2026-03-25T08:44:13.000000Z", "updated_at": "2026-05-27T08:19:17.000000Z", "status": "running:unhealthy" }
+]

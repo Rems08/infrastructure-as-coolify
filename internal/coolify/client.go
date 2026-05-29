@@ -213,6 +213,22 @@ func (c *Client) ListServers(ctx context.Context) ([]Server, error) {
 	return servers, nil
 }
 
+// GetServerResources fetches the resources hosted on a server via
+// GET /api/v1/servers/{uuid}/resources. The response is a homogeneous array whose `type`
+// field discriminates the kind (application | service | standalone-<engine>); the resolver
+// reads it to discover databases.
+func (c *Client) GetServerResources(ctx context.Context, serverUUID string) ([]ServerResource, error) {
+	req, err := c.newRequest(ctx, "/servers/"+serverUUID+"/resources")
+	if err != nil {
+		return nil, err
+	}
+	var resources []ServerResource
+	if err := c.getJSON(req, &resources, "GET server resources "+serverUUID); err != nil {
+		return nil, err
+	}
+	return resources, nil
+}
+
 // GetApplication fetches a single application by UUID via GET /api/v1/applications/{uuid}.
 // It is the documented endpoint used to read remote state for the plan diff.
 func (c *Client) GetApplication(ctx context.Context, uuid string) (Application, error) {

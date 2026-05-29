@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,6 +56,7 @@ type resolverClient interface {
 	ListServers(ctx context.Context) ([]coolify.Server, error)
 	ListApplications(ctx context.Context) ([]coolify.Application, error)
 	ListServices(ctx context.Context) ([]coolify.Service, error)
+	GetServerResources(ctx context.Context, serverUUID string) ([]coolify.ServerResource, error)
 }
 
 // Resolve builds the logical-key → identifier map from live Coolify state using only
@@ -65,9 +67,10 @@ type resolverClient interface {
 // joins each application's and service's environment_id back to its environment and
 // project names.
 //
-// Databases remain out of scope: their list response is an undocumented placeholder in
-// the pinned OpenAPI spec, so resolving them would mean inventing the response shape.
-// Live resolution for databases lands once the upstream spec documents them.
+// Databases are resolved via GET /servers/{uuid}/resources (a typed endpoint), because
+// the dedicated listing endpoints are placeholders in the pinned spec
+// (coollabsio/coolify#10449). That response carries no environment_id, so databases are
+// keyed by name alone (see resolveDatabases).
 func Resolve(ctx context.Context, client resolverClient) (Map, error) {
 	projects, err := client.ListProjects(ctx)
 	if err != nil {
@@ -115,7 +118,42 @@ func Resolve(ctx context.Context, client resolverClient) (Map, error) {
 	for _, s := range services {
 		mapChild(m, envByID, projectByID, resource.KindService, s.Name, s.UUID, s.EnvironmentID)
 	}
+
+	if err := resolveDatabases(ctx, client, servers, m); err != nil {
+		return nil, err
+	}
 	return m, nil
+}
+
+// resolveDatabases keys each standalone database found across the servers by its name.
+// The /servers/{uuid}/resources response carries no project or environment, so databases
+// are addressed by name alone — Coolify enforces unique database names per server, and the
+// Beenaire convention suffixes environments explicitly (e.g. -staging). The "standalone-"
+// type prefix (observed runtime 2026-05-29: standalone-postgresql, standalone-redis, ...)
+// distinguishes a database from an application or service in the homogeneous array.
+func resolveDatabases(ctx context.Context, c resolverClient, servers []coolify.Server, m Map) error {
+	var total, filtered int
+	for _, srv := range servers {
+		resources, err := c.GetServerResources(ctx, srv.UUID)
+		if err != nil {
+			return fmt.Errorf("resolve: get resources for server %q: %w", srv.UUID, err)
+		}
+		total += len(resources)
+		for _, r := range resources {
+			if !strings.HasPrefix(r.Type, "standalone-") {
+				continue
+			}
+			filtered++
+			m[ResourceKey{Kind: resource.KindDatabase, Name: r.Name}] = r.UUID
+		}
+	}
+	slog.InfoContext(ctx, "resolved databases",
+		"resolver.databases.servers_scanned", len(servers),
+		"resolver.databases.resources_total", total,
+		"resolver.databases.standalone_filtered", filtered,
+		"resolver.databases.resolved", filtered,
+	)
+	return nil
 }
 
 // mapChild keys an application or service by its (project, environment, name) coordinates,

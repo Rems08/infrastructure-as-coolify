@@ -47,6 +47,22 @@ type Server struct {
 	Name string `json:"name"`
 }
 
+// ServerResource is one item of the GET /servers/{uuid}/resources array. The Type field
+// discriminates the resource kind; observed runtime values 2026-05-29 are "application",
+// "service", and "standalone-<engine>" (e.g. standalone-postgresql, standalone-redis).
+// The resolver uses this typed endpoint to discover databases, because the dedicated
+// listing endpoints (GET /databases, GET /resources) are placeholders in the pinned spec
+// (coollabsio/coolify#10449).
+type ServerResource struct {
+	ID        int    `json:"id"`
+	UUID      string `json:"uuid"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
 // CreateResponse is the shared 201 body of the create endpoints: a single uuid.
 type CreateResponse struct {
 	UUID string `json:"uuid"`

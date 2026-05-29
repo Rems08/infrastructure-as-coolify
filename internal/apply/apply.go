@@ -269,11 +269,22 @@ func (e *Engine) applicationCreateRequest(op Operation) (coolify.CreateApplicati
 		EnvironmentName: app.Metadata.Environment,
 		Name:            app.Metadata.Name,
 		Domains:         app.Spec.FQDN,
-		PortsExposes:    strconv.Itoa(app.Spec.Port),
+		Dockerfile:      app.Spec.Dockerfile,
 	}
-	if app.Spec.Image != nil {
+	switch {
+	case app.Spec.Image != nil:
 		req.DockerRegistryImageName = app.Spec.Image.Name
 		req.DockerRegistryImageTag = app.Spec.Image.Tag
+	case app.Spec.Source != nil:
+		req.GitRepository = app.Spec.Source.GitRepository
+		req.GitBranch = app.Spec.Source.GitBranch
+	}
+	// A git source carries its own ports_exposes; otherwise the optional top-level port
+	// (required for dockerimage, optional for an inline Dockerfile) supplies it.
+	if app.Spec.Source != nil {
+		req.PortsExposes = app.Spec.Source.PortsExposes
+	} else if app.Spec.Port > 0 {
+		req.PortsExposes = strconv.Itoa(app.Spec.Port)
 	}
 	return req, nil
 }

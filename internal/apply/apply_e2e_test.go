@@ -226,6 +226,100 @@ func TestApplyE2EDeleteReverseOrder(t *testing.T) {
 	}
 }
 
+func appE2EResolved() state.Map {
+	return state.Map{
+		state.ResourceKey{Kind: resource.KindProject, Name: "beenaire"}: "proj-uuid",
+		state.ResourceKey{Kind: state.KindServer, Name: "localhost"}:    "srv-uuid",
+	}
+}
+
+// applyAppCreateE2E applies a single Application create against a recording server and
+// returns the captured requests.
+func applyAppCreateE2E(t *testing.T, app resource.Application) []wroteReq {
+	t.Helper()
+	srv, reqs := e2eServer(t, "")
+	eng := apply.NewEngine(e2eClient(t, srv.URL), appE2EResolved(), nil)
+	if _, err := eng.Apply(context.Background(), []apply.Operation{apply.ApplicationOp(apply.OpCreate, app, nil)}); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	return *reqs
+}
+
+func sourceApp(name, buildPack string) resource.Application {
+	return resource.Application{
+		Metadata: resource.ApplicationMeta{Name: name, Project: "beenaire", Environment: "staging"},
+		Spec: resource.ApplicationSpec{
+			BuildPack:   buildPack,
+			Source:      &resource.SourceSpec{GitRepository: "https://github.com/acme/" + name, GitBranch: "main", PortsExposes: "3000"},
+			Destination: resource.DestinationRef{Server: "localhost", Network: "coolify"},
+		},
+	}
+}
+
+func TestApplicationE2EDockerfileInline(t *testing.T) {
+	app := resource.Application{
+		Metadata: resource.ApplicationMeta{Name: "tool", Project: "beenaire", Environment: "staging"},
+		Spec: resource.ApplicationSpec{
+			BuildPack:   "dockerfile",
+			Dockerfile:  "FROM busybox\nCMD [\"true\"]",
+			Destination: resource.DestinationRef{Server: "localhost", Network: "coolify"},
+			Port:        8080,
+		},
+	}
+	reqs := applyAppCreateE2E(t, app)
+	if got := paths(reqs); len(got) != 1 || got[0] != "POST /api/v1/applications/dockerfile" {
+		t.Fatalf("requests = %v, want one POST /applications/dockerfile", got)
+	}
+	body := reqs[0].body
+	// Inline Dockerfile is sent verbatim (not base64-encoded like a service compose).
+	if body["dockerfile"] != "FROM busybox\nCMD [\"true\"]" {
+		t.Errorf("dockerfile body = %v, want verbatim content", body["dockerfile"])
+	}
+	if body["ports_exposes"] != "8080" {
+		t.Errorf("ports_exposes = %v, want 8080", body["ports_exposes"])
+	}
+}
+
+func TestApplicationE2ENixpacksFromGit(t *testing.T) {
+	reqs := applyAppCreateE2E(t, sourceApp("web", "nixpacks"))
+	if got := paths(reqs); len(got) != 1 || got[0] != "POST /api/v1/applications/public" {
+		t.Fatalf("requests = %v, want one POST /applications/public", got)
+	}
+	body := reqs[0].body
+	if body["build_pack"] != "nixpacks" {
+		t.Errorf("build_pack = %v, want nixpacks", body["build_pack"])
+	}
+	if body["git_repository"] != "https://github.com/acme/web" || body["git_branch"] != "main" {
+		t.Errorf("git fields not wired: %+v", body)
+	}
+}
+
+func TestApplicationE2EDockerComposeFromGit(t *testing.T) {
+	reqs := applyAppCreateE2E(t, sourceApp("stack", "docker-compose"))
+	body := reqs[0].body
+	// IaC "docker-compose" must reach the API as the upstream "dockercompose" spelling.
+	if body["build_pack"] != "dockercompose" {
+		t.Errorf("build_pack = %v, want dockercompose (translated)", body["build_pack"])
+	}
+	if got := paths(reqs); got[0] != "POST /api/v1/applications/public" {
+		t.Errorf("path = %v, want /applications/public", got)
+	}
+}
+
+func TestApplicationE2EDockerfileFromGit(t *testing.T) {
+	reqs := applyAppCreateE2E(t, sourceApp("repo-with-dockerfile", "dockerfile"))
+	if got := paths(reqs); got[0] != "POST /api/v1/applications/public" {
+		t.Fatalf("dockerfile-from-git must use /applications/public, got %v", got)
+	}
+	body := reqs[0].body
+	if body["build_pack"] != "dockerfile" {
+		t.Errorf("build_pack = %v, want dockerfile", body["build_pack"])
+	}
+	if _, ok := body["dockerfile"]; ok {
+		t.Errorf("dockerfile-from-git must not carry an inline dockerfile body: %+v", body)
+	}
+}
+
 func TestApplyE2EPartialFailureMidApply(t *testing.T) {
 	// The environment create fails; the project create already succeeded.
 	srv, reqs := e2eServer(t, "/api/v1/projects/proj-uuid/environments")

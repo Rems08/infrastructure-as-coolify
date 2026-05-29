@@ -1,6 +1,6 @@
 module github.com/Rems08/infrastructure-as-coolify
 
-go 1.23
+go 1.25
 
 require (
 	github.com/goccy/go-yaml v1.13.0

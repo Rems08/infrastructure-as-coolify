@@ -66,6 +66,29 @@ dockers_v2:
       org.opencontainers.image.revision: "{{ .FullCommit }}"
       org.opencontainers.image.licenses: CC0-1.0
 
+# Keyless signing: cosign mints a short-lived certificate from the workflow's
+# OIDC identity, so there is no long-lived key to manage. Each bundle is
+# self-contained (signature + certificate + transparency-log proof).
+signs:
+  - cmd: cosign
+    signature: "${artifact}.bundle"
+    args:
+      - sign-blob
+      - "--output-bundle=${signature}"
+      - "--yes"
+      - "${artifact}"
+    artifacts: archive
+    output: true
+
+docker_signs:
+  - cmd: cosign
+    args:
+      - sign
+      - "--yes"
+      - "${artifact}"
+    artifacts: all
+    output: true
+
 release:
   github:
     owner: Rems08

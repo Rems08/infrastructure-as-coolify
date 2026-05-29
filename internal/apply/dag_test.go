@@ -40,7 +40,7 @@ func TestOrderApplyLinear(t *testing.T) {
 	pi := indexOf(out, resource.KindProject, "p")
 	ei := indexOf(out, resource.KindEnvironment, "staging")
 	ai := indexOf(out, resource.KindApplication, "a")
-	if !(pi < ei && ei < ai) {
+	if pi >= ei || ei >= ai {
 		t.Errorf("want project(%d) < environment(%d) < application(%d)", pi, ei, ai)
 	}
 }
@@ -92,7 +92,7 @@ func TestOrderDeleteReverse(t *testing.T) {
 	pi := indexOf(out, resource.KindProject, "p")
 	ei := indexOf(out, resource.KindEnvironment, "staging")
 	ai := indexOf(out, resource.KindApplication, "a")
-	if !(ai < ei && ei < pi) {
+	if ai >= ei || ei >= pi {
 		t.Errorf("delete order must be reverse: application(%d) < environment(%d) < project(%d)", ai, ei, pi)
 	}
 }

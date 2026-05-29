@@ -80,7 +80,7 @@ func TestDestroyE2E(t *testing.T) {
 		if appIdx < 0 || envIdx < 0 || projIdx < 0 {
 			t.Fatalf("missing DELETEs in %v", paths)
 		}
-		if !(appIdx < envIdx && envIdx < projIdx) {
+		if appIdx >= envIdx || envIdx >= projIdx {
 			t.Errorf("delete order = %v, want application < environment < project", paths)
 		}
 	})

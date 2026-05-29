@@ -22,6 +22,13 @@ jobs:
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
+      - name: Provision age key for SOPS
+        # Write the private age key (masked secret) to an owner-only file; iac-coolify
+        # refuses a group/other-readable key.
+        run: |
+          install -m 600 /dev/null "$RUNNER_TEMP/age.key"
+          printf '%s' "${{ secrets.SOPS_AGE_KEY }}" > "$RUNNER_TEMP/age.key"
+          echo "SOPS_AGE_KEY_FILE=$RUNNER_TEMP/age.key" >> "$GITHUB_ENV"
       - name: Install iac-coolify
         run: go install github.com/Rems08/infrastructure-as-coolify/cmd/iac-coolify@latest
       - name: Plan
@@ -39,6 +46,11 @@ jobs:
       IAC_COOLIFY_ACTOR: ${{ github.actor }}
     steps:
       - uses: actions/checkout@v4
+      - name: Provision age key for SOPS
+        run: |
+          install -m 600 /dev/null "$RUNNER_TEMP/age.key"
+          printf '%s' "${{ secrets.SOPS_AGE_KEY }}" > "$RUNNER_TEMP/age.key"
+          echo "SOPS_AGE_KEY_FILE=$RUNNER_TEMP/age.key" >> "$GITHUB_ENV"
       - name: Install iac-coolify
         run: go install github.com/Rems08/infrastructure-as-coolify/cmd/iac-coolify@latest
       - name: Apply

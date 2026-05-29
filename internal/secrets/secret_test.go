@@ -107,15 +107,36 @@ func TestUnmarshalYAML_RejectsLiteral(t *testing.T) {
 	}
 }
 
-// TestUnmarshalYAML_RejectsSOPS asserts ${sops:...} is rejected until SOPS sourcing ships.
-func TestUnmarshalYAML_RejectsSOPS(t *testing.T) {
+// TestParseSOPSRefPending asserts ${sops:path} parses to a pending Secret carrying the
+// origin and path, with the value left unresolved until config load supplies the manifest
+// directory.
+func TestParseSOPSRefPending(t *testing.T) {
 	var s Secret
-	err := s.parse("${sops:stripe.key}")
-	if err == nil {
-		t.Fatal("expected SOPS sourcing to be rejected")
+	if err := s.parse("${sops:databases.staging.password}"); err != nil {
+		t.Fatalf("parse ${sops:...}: %v", err)
 	}
-	if !strings.Contains(err.Error(), "SOPS sourcing is not supported") {
-		t.Errorf("error = %q, want mention of unsupported SOPS sourcing", err)
+	if !s.IsPendingSOPS() {
+		t.Error("expected a pending SOPS secret")
+	}
+	if s.IsZero() {
+		t.Error("a pending SOPS secret must not be zero")
+	}
+	if got, want := s.SOPSPath(), "databases.staging.password"; got != want {
+		t.Errorf("SOPSPath() = %q, want %q", got, want)
+	}
+	if got := s.Origin(); got != "${sops:databases.staging.password}" {
+		t.Errorf("Origin() = %q", got)
+	}
+	if got := s.String(); got != "[REDACTED]" {
+		t.Errorf("pending SOPS secret String() = %q, want [REDACTED]", got)
+	}
+}
+
+// TestUnmarshalYAMLError asserts a YAML node that cannot decode into a string is rejected.
+func TestUnmarshalYAMLError(t *testing.T) {
+	var s Secret
+	if err := s.UnmarshalYAML([]byte("[1, 2, 3]")); err == nil {
+		t.Error("want error unmarshalling a sequence into a Secret")
 	}
 }
 

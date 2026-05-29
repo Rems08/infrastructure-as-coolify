@@ -47,8 +47,11 @@ bin/
 cover.out
 coverage.html
 
-# SOPS+age artifacts (Wave 4+)
+# SOPS+age artifacts. Never commit a private age key; only encrypted files and the
+# public recipient (.sops.yaml) are safe to track.
 *.enc.yaml.dec
 secrets.dec.yaml
+*.age.key
+examples/secrets-sops/.fixture.age.key
 
 CLAUDE.md

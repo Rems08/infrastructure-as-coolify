@@ -87,7 +87,7 @@ func TestDeleteOperationsReverseOrder(t *testing.T) {
 	for i, op := range ordered {
 		idx[op.Kind] = i
 	}
-	if !(idx[resource.KindApplication] < idx[resource.KindEnvironment] && idx[resource.KindEnvironment] < idx[resource.KindProject]) {
+	if idx[resource.KindApplication] >= idx[resource.KindEnvironment] || idx[resource.KindEnvironment] >= idx[resource.KindProject] {
 		t.Errorf("delete order = %v, want application < environment < project", opKinds(ordered))
 	}
 }

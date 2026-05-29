@@ -1,0 +1,26 @@
+# Demonstrates SOPS+age secrets at rest. The DATABASE_PASSWORD value is read from the
+# colocated secrets.enc.yaml at the dotted path databases.staging.password, decrypted in
+# memory, and shown as [REDACTED] in every plan/apply/validate output.
+#
+# Decrypt requires the matching age private key. Point SOPS at it, e.g.:
+#   export SOPS_AGE_KEY_FILE=$PWD/examples/secrets-sops/.fixture.age.key
+#   iac-coolify validate examples/secrets-sops/coolify.yaml
+# See README "SOPS+age secrets at rest" for generating your own key.
+api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: api
+  project: beenaire
+  environment: staging
+spec:
+  build_pack: dockerimage
+  image:
+    name: registry.example.com/api
+    tag: v1-0-0
+  port: 8080
+  destination:
+    server: localhost
+    network: coolify
+  env_vars:
+    - name: DATABASE_PASSWORD
+      value_secret: "${sops:databases.staging.password}"

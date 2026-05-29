@@ -1,67 +1,73 @@
-# golangci-lint strict preset (cf. CLAUDE.md §6 + plan.md §2).
-# Pinned to golangci-lint v1.61 (see .github/workflows/ci.yml).
+# golangci-lint strict preset. Pinned to golangci-lint v2 (see .github/workflows/ci.yml).
+# gosimple is folded into staticcheck in v2; exclusion presets mirror v1's default-exclusions.
+version: "2"
 run:
-  timeout: 5m
   tests: true
-
 linters:
-  disable-all: true
+  default: none
   enable:
-    # base
+    - bodyclose
     - errcheck
-    - gosimple
+    - errorlint
+    - funlen
+    - gocognit
+    - gocritic
+    - gocyclo
+    - gosec
     - govet
     - ineffassign
-    - staticcheck
-    - unused
-    # complexity
-    - gocyclo
-    - gocognit
-    - funlen
-    # style
-    - revive
-    # security
-    - gosec
-    # bugs
-    - bodyclose
-    - errorlint
     - nilerr
     - noctx
-    # opinionated
-    - gocritic
-
-linters-settings:
-  gocyclo:
-    min-complexity: 15
-  gocognit:
-    min-complexity: 20
-  funlen:
-    lines: 80
-    statements: 50
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment # micro-optimisation, noise vs readability
-  revive:
+    - revive
+    - staticcheck
+    - unused
+  settings:
+    funlen:
+      lines: 80
+      statements: 50
+    gocognit:
+      min-complexity: 20
+    gocyclo:
+      min-complexity: 15
+    gosec:
+      excludes:
+        - G104
+    govet:
+      disable:
+        - fieldalignment
+      enable-all: true
+    revive:
+      rules:
+        - name: exported
+        - name: error-strings
+        - name: error-naming
+        - name: unused-parameter
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: exported
-      - name: error-strings
-      - name: error-naming
-      - name: unused-parameter
-  gosec:
-    excludes:
-      - G104 # handled by errcheck
-
+      - linters:
+          - funlen
+          - gocognit
+          - gocyclo
+          - gosec
+          - noctx
+        path: _test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
-  exclude-rules:
-    # Test files: table-driven tests legitimately exceed length/complexity bounds,
-    # and hardcoded "secrets" in fixtures are canaries, not real credentials.
-    - path: _test\.go
-      linters:
-        - funlen
-        - gocyclo
-        - gocognit
-        - gosec
-        - noctx
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

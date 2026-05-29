@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	"github.com/Rems08/infrastructure-as-coolify/internal/resource"
+	"github.com/Rems08/infrastructure-as-coolify/internal/secrets"
 )
 
 // envPattern matches ${env:VAR} where VAR is an upper-snake identifier. The anchor
@@ -83,4 +84,30 @@ func interpolateServiceFields(svc *resource.Service) error {
 		&svc.Spec.Description, &svc.Spec.FQDN, &svc.Spec.Type, &svc.Spec.DockerComposePath,
 		&svc.Spec.Destination.Server,
 	)
+}
+
+// resolveSecretEntries decrypts any pending ${sops:path} secret in entries, reading the
+// secrets.enc.yaml colocated with iacPath. ${env:} secrets are resolved at decode time and
+// left untouched here.
+func resolveSecretEntries(iacPath string, entries []resource.EnvVarEntry) error {
+	for i := range entries {
+		if err := resolveSecret(iacPath, &entries[i].ValueSecret); err != nil {
+			return fmt.Errorf("env_vars[%d] %q: %w", i, entries[i].Name, err)
+		}
+	}
+	return nil
+}
+
+// resolveSecret decrypts a single pending ${sops:path} secret in place; a non-pending
+// secret is left unchanged.
+func resolveSecret(iacPath string, sec *secrets.Secret) error {
+	if !sec.IsPendingSOPS() {
+		return nil
+	}
+	resolved, err := secrets.LoadSOPSValue(iacPath, sec.SOPSPath())
+	if err != nil {
+		return err
+	}
+	*sec = resolved
+	return nil
 }

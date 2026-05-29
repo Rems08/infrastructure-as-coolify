@@ -1,0 +1,66 @@
+# Reusable iac-coolify CI/CD template. Include it and extend the jobs you need:
+#
+#   include:
+#     - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.0-rc.2/.gitlab/templates/iac-coolify.yml"
+#
+#   plan:
+#     extends: .iac-coolify-plan
+#   apply:
+#     extends: .iac-coolify-apply
+#   destroy:
+#     extends: .iac-coolify-destroy
+#
+# COOLIFY_API_TOKEN (and any CF_ACCESS_CLIENT_SECRET) must be masked, protected
+# CI/CD variables (Settings -> CI/CD -> Variables); never hardcode them here.
+#
+# The released container image is distroless and has no shell, so it cannot run a
+# GitLab job script. These jobs instead fetch the static release binary onto a
+# slim shell image and verify its checksum before running it.
+
+variables:
+  IAC_COOLIFY_VERSION: "0.1.0-rc.2"
+  IAC_COOLIFY_ARCH: "amd64"
+  IAC_COOLIFY_PATH: "."
+  # Extra flags such as --target <name> or --env <name>; left empty by default.
+  IAC_COOLIFY_ARGS: ""
+
+.iac-coolify-base:
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache curl tar
+    - |
+      base="https://github.com/Rems08/infrastructure-as-coolify/releases/download/v${IAC_COOLIFY_VERSION}"
+      archive="iac-coolify_${IAC_COOLIFY_VERSION}_linux_${IAC_COOLIFY_ARCH}.tar.gz"
+      cd /tmp
+      curl -fsSLO "${base}/${archive}"
+      curl -fsSLO "${base}/checksums.txt"
+      grep " ${archive}\$" checksums.txt | sha256sum -c -
+      tar -xzf "${archive}" iac-coolify
+      install -m 0755 iac-coolify /usr/local/bin/iac-coolify
+      cd "${CI_PROJECT_DIR}"
+
+.iac-coolify-plan:
+  extends: .iac-coolify-base
+  stage: test
+  script:
+    - iac-coolify plan "${IAC_COOLIFY_PATH}" ${IAC_COOLIFY_ARGS} --detailed-exitcode
+
+.iac-coolify-apply:
+  extends: .iac-coolify-base
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  variables:
+    IAC_COOLIFY_ACTOR: "$GITLAB_USER_LOGIN"
+  script:
+    - iac-coolify apply "${IAC_COOLIFY_PATH}" ${IAC_COOLIFY_ARGS} --auto-approve
+
+.iac-coolify-destroy:
+  extends: .iac-coolify-base
+  stage: deploy
+  when: manual
+  variables:
+    IAC_COOLIFY_ACTOR: "$GITLAB_USER_LOGIN"
+  script:
+    - iac-coolify destroy "${IAC_COOLIFY_PATH}" ${IAC_COOLIFY_ARGS} --auto-approve

@@ -1,0 +1,18 @@
+api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: web-frontend
+  project: beenaire
+  environment: production
+spec:
+  build_pack: nixpacks
+  # Public git source: Nixpacks auto-detects the build. git_repository,
+  # git_branch and ports_exposes are all required for a source build.
+  source:
+    git_repository: https://github.com/beenaire/web-frontend
+    git_branch: main
+    ports_exposes: "3000"
+  destination:
+    server: localhost
+    network: coolify
+  fqdn: https://web.beenaire.com

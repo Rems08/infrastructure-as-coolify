@@ -1,0 +1,18 @@
+# Intentionally invalid: the git_repository uses a non-allowlisted URL scheme.
+# `validate` must reject it with an "unsupported URL scheme" error (only https://,
+# http:// and git@ are accepted).
+api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: bad-scheme
+  project: demo
+  environment: staging
+spec:
+  build_pack: static
+  source:
+    git_repository: file:///etc/passwd
+    git_branch: main
+    ports_exposes: "80"
+  destination:
+    server: localhost
+    network: coolify

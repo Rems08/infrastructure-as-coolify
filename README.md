@@ -8,6 +8,7 @@
 [![GHCR](https://img.shields.io/badge/ghcr.io-Rems08%2Finfrastructure--as--coolify-blue?logo=docker)](https://github.com/Rems08/infrastructure-as-coolify/pkgs/container/infrastructure-as-coolify)
 [![cosign](https://img.shields.io/badge/cosign-keyless-2ea44f?logo=sigstore)](#verifying-release-signatures)
 [![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
+[![docs](https://img.shields.io/badge/docs-mdBook-1f6feb?logo=readthedocs&logoColor=white)](https://rems08.github.io/infrastructure-as-coolify/)
 
 > Declarative Infrastructure as Code for [Coolify](https://coolify.io) — YAML in, `plan`/`apply`/`destroy` out. No HCL, no state file, no magic.
 
@@ -337,8 +338,50 @@ CI secrets, and set `IAC_COOLIFY_ACTOR` so the audit log attributes the change. 
 SOPS, store the age private key as a masked secret (`SOPS_AGE_KEY`) and write it to an
 owner-only file pointed at by `SOPS_AGE_KEY_FILE`. Run `plan`
 on pull/merge requests and `apply --auto-approve` on the protected default branch.
-Ready-to-copy workflows: [`examples/ci/github-actions.yml`](examples/ci/github-actions.yml)
-and [`examples/ci/gitlab-ci.yml`](examples/ci/gitlab-ci.yml).
+
+### GitHub Actions
+
+Use the composite action — the version is selected by the action ref (it runs the published
+container image as a Linux Docker action):
+
+```yaml
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Rems08/infrastructure-as-coolify@v1
+        with:
+          command: plan                 # plan | apply | destroy | validate
+          path: coolify/
+          env: staging                  # one or more, separated by spaces or commas
+          api-token: ${{ secrets.COOLIFY_API_TOKEN }}
+```
+
+### GitLab CI
+
+Include the reusable template and extend the jobs you need; `apply` runs on the default branch
+and tags, `destroy` is manual:
+
+```yaml
+include:
+  - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.0-rc.2/.gitlab/templates/iac-coolify.yml"
+
+plan:
+  extends: .iac-coolify-plan
+apply:
+  extends: .iac-coolify-apply
+destroy:
+  extends: .iac-coolify-destroy
+```
+
+Set `IAC_COOLIFY_PATH` and `IAC_COOLIFY_ARGS` (e.g. `--env staging`) as CI variables, and store
+`COOLIFY_API_TOKEN` as a masked, protected variable.
+
+For a runner without the action or template — or to pin via `go install` — the raw reference
+workflows remain at [`examples/ci/github-actions.yml`](examples/ci/github-actions.yml) and
+[`examples/ci/gitlab-ci.yml`](examples/ci/gitlab-ci.yml). Full documentation lives at the
+[doc site](https://rems08.github.io/infrastructure-as-coolify/).
 
 ## License
 

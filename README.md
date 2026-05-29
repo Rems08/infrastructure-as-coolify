@@ -92,10 +92,21 @@ A **Service** is a docker-compose stack. It sources its definition from exactly 
   Coolify on `apply`.
 - `type` — a Coolify one-click template identifier such as `gitea-with-mysql`.
 
-> **`apply` build packs:** the `Application` schema currently models a prebuilt image, so
-> `build_pack: dockerimage` is the build pack `apply` can create today. `dockerfile`,
-> `nixpacks` and `docker-compose` validate and `plan`, but creating them needs source
-> fields (a Dockerfile body, or a git repository) the schema does not yet declare.
+An **Application** is built by one of six build packs, each with its own source of truth:
+
+- `dockerimage` — a prebuilt image (`image.name` + `image.tag`).
+- `dockerfile` — either an inline `dockerfile` (Dockerfile content, no git) or a git
+  `source`; exactly one of the two.
+- `nixpacks`, `docker-compose`, `static`, `railpack` — a public git `source`
+  (`git_repository` + `git_branch` + `ports_exposes`).
+
+A git `source.git_repository` must use an `https://`, `http://` or `git@` URL; an inline
+`dockerfile` is capped at 1 MB. The IaC build pack `docker-compose` is sent to Coolify
+under its upstream spelling `dockercompose`.
+
+> **Private git sources:** applications from a private GitHub App or deploy key are not yet
+> supported (they need a separate credential resolver). Use a public repository, an inline
+> Dockerfile, or a prebuilt image.
 
 > **Service domains:** Coolify binds domains per docker-compose sub-service, so a
 > Service's `fqdn` is advisory metadata for now and is not applied on create.

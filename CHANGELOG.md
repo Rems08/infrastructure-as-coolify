@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased] - 2026-05-29
 
+### Added (Wave 3.5b)
+
+- `Application` build packs extended from one to six creatable variants: `dockerimage`
+  (prebuilt image), `dockerfile` (inline Dockerfile content **or** a git `source`),
+  `nixpacks`, `docker-compose`, `static` and `railpack` (public git `source`). `apply`
+  routes each to the right Coolify endpoint (`/applications/dockerimage`,
+  `/applications/dockerfile`, `/applications/public`).
+- `spec.dockerfile` (inline Dockerfile content) and `spec.source`
+  (`git_repository` + `git_branch` + `ports_exposes`) fields, with exactly-one-of
+  validation per build pack.
+- Input-validation ratchets for the new fields: an inline Dockerfile is capped at 1 MB;
+  a `git_branch` must match `^[a-zA-Z0-9._/-]{1,255}$` (rejecting option-injection such as
+  `--upload-pack=`); a `git_repository` must use an `https://`, `http://` or `git@` scheme.
+- The IaC build pack `docker-compose` is translated to Coolify's `dockercompose` spelling.
+
+### Deferred to V0.2
+
+- Applications from a private GitHub App or deploy key (`/applications/private-github-app`,
+  `/applications/private-deploy-key`) — they need a separate credential resolver.
+- A path-based (rather than inline) Dockerfile.
+
 ### Added (Wave 3.5a)
 
 - `Service` resource: a Coolify docker-compose stack sourced from exactly one of

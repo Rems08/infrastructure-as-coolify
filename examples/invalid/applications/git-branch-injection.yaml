@@ -1,0 +1,18 @@
+# Intentionally invalid: the git_branch carries a git option-injection payload.
+# `validate` must reject it with "branch name format" before the value could ever
+# reach a remote clone.
+api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: branch-injection
+  project: demo
+  environment: staging
+spec:
+  build_pack: nixpacks
+  source:
+    git_repository: https://github.com/acme/app
+    git_branch: "--upload-pack=evil"
+    ports_exposes: "3000"
+  destination:
+    server: localhost
+    network: coolify

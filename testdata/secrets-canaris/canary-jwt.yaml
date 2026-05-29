@@ -6,6 +6,7 @@ metadata:
   environment: staging
 spec:
   build_pack: dockerfile
+  dockerfile: "FROM busybox"
   destination:
     server: localhost
     network: coolify

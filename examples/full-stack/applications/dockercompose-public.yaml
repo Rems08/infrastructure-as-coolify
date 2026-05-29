@@ -1,0 +1,16 @@
+api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: legacy-stack
+  project: beenaire
+  environment: production
+spec:
+  # IaC spelling is "docker-compose"; it reaches Coolify as "dockercompose".
+  build_pack: docker-compose
+  source:
+    git_repository: https://github.com/beenaire/legacy-stack
+    git_branch: release
+    ports_exposes: "8080"
+  destination:
+    server: localhost
+    network: coolify

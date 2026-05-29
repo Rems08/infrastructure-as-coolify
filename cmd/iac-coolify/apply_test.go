@@ -47,14 +47,29 @@ func TestApplyCommand_DryRunBuildsServiceOp(t *testing.T) {
 	if jErr := json.Unmarshal([]byte(out), &got); jErr != nil {
 		t.Fatalf("parse json: %v\n%s", jErr, out)
 	}
-	// project + environment + service, ordered so the service comes last.
-	if got.ToAdd != 3 {
-		t.Errorf("to_add = %d, want 3 (project+environment+service)", got.ToAdd)
+	// project + environment + service + 3 applications, with the service and applications
+	// ordered after the project and environment they depend on.
+	if got.ToAdd != 6 {
+		t.Errorf("to_add = %d, want 6 (project + environment + service + 3 applications)", got.ToAdd)
 	}
-	last := got.Operations[len(got.Operations)-1]
-	if !strings.Contains(last, "Service/beenaire/production/observability-stack") {
-		t.Errorf("last op = %q, want the Service ordered after its project and environment", last)
+	svc := indexOfContaining(got.Operations, "Service/beenaire/production/observability-stack")
+	proj := indexOfContaining(got.Operations, "Project/beenaire")
+	env := indexOfContaining(got.Operations, "Environment/beenaire/production")
+	if svc < 0 || proj < 0 || env < 0 {
+		t.Fatalf("missing expected ops in %v", got.Operations)
 	}
+	if svc < proj || svc < env {
+		t.Errorf("service must be ordered after its project and environment: %v", got.Operations)
+	}
+}
+
+func indexOfContaining(ops []string, sub string) int {
+	for i, op := range ops {
+		if strings.Contains(op, sub) {
+			return i
+		}
+	}
+	return -1
 }
 
 func TestApplyCommand_NonInteractiveRefuses(t *testing.T) {

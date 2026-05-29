@@ -29,6 +29,8 @@ var buildPacks = map[string]bool{
 	"dockerimage":    true,
 	"nixpacks":       true,
 	"docker-compose": true,
+	"static":         true,
+	"railpack":       true,
 }
 
 // Application describes a Coolify application managed declaratively.
@@ -48,11 +50,13 @@ type ApplicationMeta struct {
 
 // ApplicationSpec is the desired state of an application.
 type ApplicationSpec struct {
-	BuildPack   string           `yaml:"build_pack" json:"build_pack" iac:"doc=Build pack to use,required,enum=dockerfile|dockerimage|nixpacks|docker-compose"`
+	BuildPack   string           `yaml:"build_pack" json:"build_pack" iac:"doc=Build pack to use,required,enum=dockerfile|dockerimage|nixpacks|docker-compose|static|railpack"`
 	Image       *ImageSpec       `yaml:"image,omitempty" json:"image,omitempty" iac:"doc=Docker image (required when build_pack is dockerimage)"`
+	Dockerfile  string           `yaml:"dockerfile,omitempty" json:"dockerfile,omitempty" iac:"doc=Inline Dockerfile content for build_pack dockerfile in inline mode; mutually exclusive with source"`
+	Source      *SourceSpec      `yaml:"source,omitempty" json:"source,omitempty" iac:"doc=Public git source for build_pack dockerfile/nixpacks/docker-compose/static/railpack"`
 	Destination DestinationRef   `yaml:"destination" json:"destination" iac:"doc=Server and network reference,required"`
 	FQDN        string           `yaml:"fqdn,omitempty" json:"fqdn,omitempty" iac:"doc=Public URL such as https://app.example.com"`
-	Port        int              `yaml:"port" json:"port" iac:"doc=Container port exposed,required"`
+	Port        int              `yaml:"port,omitempty" json:"port,omitempty" iac:"doc=Container port exposed (required for build_pack dockerimage)"`
 	HealthCheck *HealthCheckSpec `yaml:"health_check,omitempty" json:"health_check,omitempty" iac:"doc=HTTP health check configuration"`
 	Limits      *LimitsSpec      `yaml:"limits,omitempty" json:"limits,omitempty" iac:"doc=CPU and memory limits"`
 	Preview     *PreviewSpec     `yaml:"preview,omitempty" json:"preview,omitempty" iac:"doc=Pull-request preview configuration"`
@@ -64,6 +68,14 @@ type ApplicationSpec struct {
 type ImageSpec struct {
 	Name string `yaml:"name" json:"name" iac:"doc=Docker image name including the registry path,required"`
 	Tag  string `yaml:"tag" json:"tag" iac:"doc=Docker image tag,required"`
+}
+
+// SourceSpec is a public git source for a build_pack that builds from a repository
+// (dockerfile-from-git, nixpacks, docker-compose, static, railpack).
+type SourceSpec struct {
+	GitRepository string `yaml:"git_repository" json:"git_repository" iac:"doc=Public git repository URL (https:// http:// or git@),required"`
+	GitBranch     string `yaml:"git_branch" json:"git_branch" iac:"doc=Git branch to deploy,required"`
+	PortsExposes  string `yaml:"ports_exposes" json:"ports_exposes" iac:"doc=Ports the build exposes such as 3000,required"`
 }
 
 // DestinationRef references the target server and network by logical name.
@@ -146,13 +158,7 @@ func (m ApplicationMeta) validate() error {
 
 func (s ApplicationSpec) validate() error {
 	if !buildPacks[s.BuildPack] {
-		return fmt.Errorf("spec.build_pack: must be one of dockerfile|dockerimage|nixpacks|docker-compose, got %q", s.BuildPack)
-	}
-	if s.BuildPack == "dockerimage" && (s.Image == nil || s.Image.Name == "" || s.Image.Tag == "") {
-		return fmt.Errorf("spec.image: name and tag are required when build_pack is dockerimage")
-	}
-	if s.Port <= 0 {
-		return fmt.Errorf("spec.port: required and must be > 0")
+		return fmt.Errorf("spec.build_pack: must be one of dockerfile|dockerimage|nixpacks|docker-compose|static|railpack, got %q", s.BuildPack)
 	}
 	if s.Destination.Server == "" || s.Destination.Network == "" {
 		return fmt.Errorf("spec.destination: server and network are required")
@@ -160,7 +166,64 @@ func (s ApplicationSpec) validate() error {
 	if s.FQDN != "" && !strings.HasPrefix(s.FQDN, "http://") && !strings.HasPrefix(s.FQDN, "https://") {
 		return fmt.Errorf("spec.fqdn: must start with http:// or https://, got %q", s.FQDN)
 	}
+	if err := s.validateBuildSource(); err != nil {
+		return err
+	}
 	return s.validateEnvVars()
+}
+
+// validateBuildSource enforces, per build_pack, exactly one source of truth for the build:
+// dockerimage builds from `image`; dockerfile from either inline `dockerfile` content or a
+// git `source` (exactly one); every other build_pack from a git `source`. It rejects the
+// fields the chosen build_pack must not carry, so a malformed combination fails at parse
+// time rather than at apply time.
+func (s ApplicationSpec) validateBuildSource() error {
+	switch s.BuildPack {
+	case "dockerimage":
+		return s.validateImageMode()
+	case "dockerfile":
+		return s.validateDockerfileMode()
+	default:
+		return s.validateSourceMode()
+	}
+}
+
+func (s ApplicationSpec) validateImageMode() error {
+	if s.Dockerfile != "" || s.Source != nil {
+		return fmt.Errorf("spec: build_pack dockerimage uses `image` only; remove `dockerfile` and `source`")
+	}
+	if s.Image == nil || s.Image.Name == "" || s.Image.Tag == "" {
+		return fmt.Errorf("spec.image: name and tag are required when build_pack is dockerimage")
+	}
+	if s.Port <= 0 {
+		return fmt.Errorf("spec.port: required and must be > 0 when build_pack is dockerimage")
+	}
+	return nil
+}
+
+func (s ApplicationSpec) validateDockerfileMode() error {
+	if s.Image != nil {
+		return fmt.Errorf("spec: build_pack dockerfile must not set `image`")
+	}
+	hasInline := s.Dockerfile != ""
+	hasSource := s.Source != nil
+	if hasInline == hasSource {
+		return fmt.Errorf("spec: build_pack dockerfile requires exactly one of `dockerfile` (inline) or `source` (git)")
+	}
+	if hasInline {
+		return validateDockerfile(s.Dockerfile)
+	}
+	return s.Source.validate()
+}
+
+func (s ApplicationSpec) validateSourceMode() error {
+	if s.Image != nil || s.Dockerfile != "" {
+		return fmt.Errorf("spec: build_pack %q builds from a git `source`; remove `image` and `dockerfile`", s.BuildPack)
+	}
+	if s.Source == nil {
+		return fmt.Errorf("spec.source: git_repository, git_branch and ports_exposes are required when build_pack is %q", s.BuildPack)
+	}
+	return s.Source.validate()
 }
 
 func (s ApplicationSpec) validateEnvVars() error {

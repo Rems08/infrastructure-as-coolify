@@ -213,6 +213,56 @@ func TestApplyCreateUnresolvedServerErrors(t *testing.T) {
 	}
 }
 
+func projectAndServerResolved() state.Map {
+	return state.Map{
+		state.ResourceKey{Kind: resource.KindProject, Name: "beenaire"}: "proj-uuid",
+		state.ResourceKey{Kind: state.KindServer, Name: "localhost"}:    "srv-uuid",
+	}
+}
+
+func TestApplyApplicationDockerfileFromScratch(t *testing.T) {
+	mc := &mockClient{}
+	app := resource.Application{
+		Metadata: resource.ApplicationMeta{Name: "tool", Project: "beenaire", Environment: "staging"},
+		Spec: resource.ApplicationSpec{
+			BuildPack:   "dockerfile",
+			Dockerfile:  "FROM busybox\nCMD [\"true\"]",
+			Destination: resource.DestinationRef{Server: "localhost", Network: "coolify"},
+		},
+	}
+	ops := []apply.Operation{apply.ApplicationOp(apply.OpCreate, app, nil)}
+	if _, err := apply.NewEngine(mc, projectAndServerResolved(), nil).Apply(context.Background(), ops); err != nil {
+		t.Fatal(err)
+	}
+	req := mc.calls[0].appReq
+	if req.BuildPack != "dockerfile" || req.Dockerfile != "FROM busybox\nCMD [\"true\"]" {
+		t.Errorf("dockerfile create request not wired: %+v", req)
+	}
+	if req.GitRepository != "" {
+		t.Errorf("inline dockerfile must not carry git fields: %+v", req)
+	}
+}
+
+func TestApplyApplicationPublicNixpacks(t *testing.T) {
+	mc := &mockClient{}
+	app := resource.Application{
+		Metadata: resource.ApplicationMeta{Name: "web", Project: "beenaire", Environment: "staging"},
+		Spec: resource.ApplicationSpec{
+			BuildPack:   "nixpacks",
+			Source:      &resource.SourceSpec{GitRepository: "https://github.com/acme/web", GitBranch: "main", PortsExposes: "3000"},
+			Destination: resource.DestinationRef{Server: "localhost", Network: "coolify"},
+		},
+	}
+	ops := []apply.Operation{apply.ApplicationOp(apply.OpCreate, app, nil)}
+	if _, err := apply.NewEngine(mc, projectAndServerResolved(), nil).Apply(context.Background(), ops); err != nil {
+		t.Fatal(err)
+	}
+	req := mc.calls[0].appReq
+	if req.BuildPack != "nixpacks" || req.GitRepository != "https://github.com/acme/web" || req.GitBranch != "main" || req.PortsExposes != "3000" {
+		t.Errorf("nixpacks create request not wired: %+v", req)
+	}
+}
+
 func methods(calls []recordedCall) []string {
 	out := make([]string, len(calls))
 	for i, c := range calls {

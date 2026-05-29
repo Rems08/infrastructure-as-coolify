@@ -1,0 +1,23 @@
+api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: build-tool
+  project: beenaire
+  environment: production
+spec:
+  build_pack: dockerfile
+  # Inline Dockerfile content: built without a git repository. Mutually exclusive
+  # with `source`.
+  dockerfile: |
+    FROM golang:1.23-alpine AS build
+    WORKDIR /src
+    COPY . .
+    RUN go build -o /bin/tool ./cmd/tool
+    FROM gcr.io/distroless/static-debian12
+    COPY --from=build /bin/tool /bin/tool
+    ENTRYPOINT ["/bin/tool"]
+  destination:
+    server: localhost
+    network: coolify
+  fqdn: https://tool.beenaire.com
+  port: 8080

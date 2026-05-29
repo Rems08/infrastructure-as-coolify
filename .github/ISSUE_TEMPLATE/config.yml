@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & discussions
+    url: https://github.com/Rems08/infrastructure-as-coolify/discussions
+    about: Ask a question, share an idea, or discuss usage before filing an issue.
+  - name: Security vulnerability
+    url: https://github.com/Rems08/infrastructure-as-coolify/security/policy
+    about: Report a vulnerability privately — never in a public issue (see SECURITY.md).

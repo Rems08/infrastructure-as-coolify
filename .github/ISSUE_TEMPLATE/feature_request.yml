@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest a capability or improvement for iac-coolify
+title: "feat: <short summary>"
+labels: ["enhancement", "kind/feature"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What should iac-coolify do that it does not today?
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: The concrete problem this solves. Who hits it, and how often?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you tried, or other tools that solve this differently.
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Are you willing to contribute this?
+      options:
+        - "Yes, I can open a PR"
+        - "Yes, with guidance"
+        - "No, requesting only"
+    validations:
+      required: true

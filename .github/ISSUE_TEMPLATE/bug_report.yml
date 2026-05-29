@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a defect in iac-coolify
+title: "bug: <short summary>"
+labels: ["bug", "kind/bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please do **not** paste secrets, tokens, or full
+        `.iac-coolify/audit.log` contents — values are redacted by design, but env names
+        and URLs can still be sensitive.
+  - type: input
+    id: version
+    attributes:
+      label: iac-coolify version
+      description: Output of `iac-coolify version` (or the release tag / commit SHA).
+      placeholder: v0.1.0 or commit abc1234
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux (amd64)
+        - Linux (arm64)
+        - macOS (amd64)
+        - macOS (arm64)
+        - Windows (amd64)
+    validations:
+      required: true
+  - type: input
+    id: coolify-version
+    attributes:
+      label: Coolify version
+      description: The Coolify v4.x version the command targeted, if relevant.
+      placeholder: v4.0.0-beta.123
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact command(s) and a minimal manifest if possible.
+      placeholder: |
+        1. iac-coolify plan examples/minimal/
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Command output or logs. This is rendered as a code block — no need to fence it.
+      render: shell

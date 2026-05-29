@@ -1,0 +1,15 @@
+# Intentionally malicious: docker_compose_path escapes the config tree to read a file
+# outside the repository. `validate` must reject it with "must not escape". Used by the
+# path-traversal smoke and the validate test-suite. The unit tests in
+# internal/resource/composepath_test.go cover the absolute-path and control-character
+# variants as well.
+api_version: iac-coolify/v1
+kind: Service
+metadata:
+  name: evil
+  project: demo
+  environment: staging
+spec:
+  destination:
+    server: localhost
+  docker_compose_path: ../../../etc/passwd

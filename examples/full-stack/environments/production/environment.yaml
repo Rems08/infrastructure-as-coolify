@@ -1,0 +1,7 @@
+api_version: iac-coolify/v1
+kind: Environment
+metadata:
+  name: production
+  project: beenaire
+spec:
+  description: Production environment

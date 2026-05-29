@@ -4,7 +4,23 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-05-28
+## [Unreleased] - 2026-05-29
+
+### Added (Wave 3.5a)
+
+- `Service` resource: a Coolify docker-compose stack sourced from exactly one of
+  `docker_compose_path` (a repository compose file) or `type` (a one-click template
+  identifier). `validate`, `docs gen` and `apply` support it.
+- Path-traversal validation for `docker_compose_path`: absolute paths, control characters
+  and any path resolving outside the config tree are rejected before the file is read, so a
+  hostile compose path cannot exfiltrate a file outside the repository.
+- Coolify Service client methods: create (base64-encoding the compose content),
+  update, delete, start/stop/restart, and env-var CRUD plus bulk update.
+- `apply` creates services in dependency order (after their project and environment) and
+  threads the new service UUID forward; service env vars are applied in one bulk call.
+- Audit log records a Service write as `compose_hash` (sha256 of the decoded compose); the
+  compose content — which can hold inline secrets — is never written to the log.
+- The UUID resolver now also maps services.
 
 ### Added (Wave 3)
 

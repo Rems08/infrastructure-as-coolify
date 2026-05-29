@@ -5,22 +5,26 @@ import (
 	"testing"
 )
 
-func TestBuildPackMappingAllVariants(t *testing.T) {
+func TestBuildPackEndpointAllCombinations(t *testing.T) {
 	tests := []struct {
-		buildPack    string
+		name         string
+		req          CreateApplicationRequest
 		wantEndpoint string
 		wantAPIBP    string
 	}{
-		{"dockerimage", "/applications/dockerimage", ""},
-		{"dockerfile", "/applications/dockerfile", "dockerfile"},
-		{"nixpacks", "/applications/public", "nixpacks"},
-		{"docker-compose", "/applications/public", "dockercompose"},
+		{"dockerimage", CreateApplicationRequest{BuildPack: "dockerimage"}, "/applications/dockerimage", ""},
+		{"dockerfile inline", CreateApplicationRequest{BuildPack: "dockerfile", Dockerfile: "FROM busybox"}, "/applications/dockerfile", "dockerfile"},
+		{"dockerfile from git", CreateApplicationRequest{BuildPack: "dockerfile", GitRepository: "https://github.com/acme/app", GitBranch: "main"}, "/applications/public", "dockerfile"},
+		{"nixpacks", CreateApplicationRequest{BuildPack: "nixpacks"}, "/applications/public", "nixpacks"},
+		{"docker-compose", CreateApplicationRequest{BuildPack: "docker-compose"}, "/applications/public", "dockercompose"},
+		{"static", CreateApplicationRequest{BuildPack: "static"}, "/applications/public", "static"},
+		{"railpack", CreateApplicationRequest{BuildPack: "railpack"}, "/applications/public", "railpack"},
 	}
 	for _, tt := range tests {
-		t.Run(tt.buildPack, func(t *testing.T) {
-			endpoint, apiBP, err := ApplicationCreateEndpoint(tt.buildPack)
+		t.Run(tt.name, func(t *testing.T) {
+			endpoint, apiBP, err := applicationCreateEndpoint(tt.req)
 			if err != nil {
-				t.Fatalf("ApplicationCreateEndpoint(%q) error: %v", tt.buildPack, err)
+				t.Fatalf("applicationCreateEndpoint(%+v) error: %v", tt.req, err)
 			}
 			if endpoint != tt.wantEndpoint {
 				t.Errorf("endpoint = %q, want %q", endpoint, tt.wantEndpoint)
@@ -32,8 +36,20 @@ func TestBuildPackMappingAllVariants(t *testing.T) {
 	}
 }
 
-func TestBuildPackMappingUnknownIsError(t *testing.T) {
-	_, _, err := ApplicationCreateEndpoint("rust-magic")
+// TestBuildPackTranslateDockerComposeIaCToCoolify pins the one build_pack whose IaC
+// spelling (docker-compose) differs from the upstream Coolify enum (dockercompose).
+func TestBuildPackTranslateDockerComposeIaCToCoolify(t *testing.T) {
+	_, apiBP, err := applicationCreateEndpoint(CreateApplicationRequest{BuildPack: "docker-compose"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if apiBP != "dockercompose" {
+		t.Errorf("IaC docker-compose must map to Coolify dockercompose, got %q", apiBP)
+	}
+}
+
+func TestBuildPackEndpointUnknownIsError(t *testing.T) {
+	_, _, err := applicationCreateEndpoint(CreateApplicationRequest{BuildPack: "rust-magic"})
 	if err == nil {
 		t.Fatal("an unknown build_pack must be an error, not a guess")
 	}
@@ -58,14 +74,30 @@ func TestValidateCreatable(t *testing.T) {
 			wantErr: "docker_registry_image_name is required",
 		},
 		{
-			name:    "dockerfile not creatable from schema",
-			req:     CreateApplicationRequest{BuildPack: "dockerfile", Name: "api"},
-			wantErr: "does not yet model",
+			name: "dockerfile inline is creatable",
+			req:  CreateApplicationRequest{BuildPack: "dockerfile", Dockerfile: "FROM busybox"},
 		},
 		{
-			name:    "nixpacks not creatable from schema",
-			req:     CreateApplicationRequest{BuildPack: "nixpacks", Name: "api"},
+			name: "dockerfile from git is creatable",
+			req:  CreateApplicationRequest{BuildPack: "dockerfile", GitRepository: "https://github.com/acme/app", GitBranch: "main"},
+		},
+		{
+			name:    "dockerfile without inline or git",
+			req:     CreateApplicationRequest{BuildPack: "dockerfile", Name: "api"},
+			wantErr: "inline Dockerfile",
+		},
+		{
+			name: "nixpacks with git is creatable",
+			req:  CreateApplicationRequest{BuildPack: "nixpacks", GitRepository: "https://github.com/acme/app", GitBranch: "main"},
+		},
+		{
+			name:    "static without git",
+			req:     CreateApplicationRequest{BuildPack: "static", Name: "site"},
 			wantErr: "git repository",
+		},
+		{
+			name: "railpack with git is creatable",
+			req:  CreateApplicationRequest{BuildPack: "railpack", GitRepository: "https://github.com/acme/app", GitBranch: "main"},
 		},
 		{
 			name:    "unknown build_pack",

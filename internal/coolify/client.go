@@ -259,7 +259,7 @@ type applicationCreateBody struct {
 // CreateApplication creates an application, selecting the POST endpoint and body
 // build_pack from req.BuildPack. It returns the new application's UUID.
 func (c *Client) CreateApplication(ctx context.Context, req CreateApplicationRequest) (string, error) {
-	endpoint, apiBuildPack, err := ApplicationCreateEndpoint(req.BuildPack)
+	endpoint, apiBuildPack, err := applicationCreateEndpoint(req)
 	if err != nil {
 		return "", err
 	}

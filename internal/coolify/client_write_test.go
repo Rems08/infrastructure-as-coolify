@@ -97,6 +97,79 @@ func TestCreateApplicationPublicCarriesBuildPack(t *testing.T) {
 	}
 }
 
+func TestCreateApplicationDockerfileDirect(t *testing.T) {
+	srv, got := captureServer(t, http.StatusCreated, `{"uuid":"app-df-uuid"}`)
+	uuid, err := newTestClient(t, srv.URL).CreateApplication(context.Background(), coolify.CreateApplicationRequest{
+		BuildPack:       "dockerfile",
+		ProjectUUID:     "proj-uuid",
+		ServerUUID:      "srv-uuid",
+		EnvironmentName: "staging",
+		Name:            "tool",
+		PortsExposes:    "8080",
+		Dockerfile:      "FROM busybox\nCMD [\"true\"]",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uuid != "app-df-uuid" {
+		t.Errorf("uuid = %q, want app-df-uuid", uuid)
+	}
+	req := (*got)[0]
+	if req.method != http.MethodPost || req.path != "/api/v1/applications/dockerfile" {
+		t.Errorf("got %s %s, want POST /api/v1/applications/dockerfile", req.method, req.path)
+	}
+	if req.idemp == "" {
+		t.Error("create must carry an Idempotency-Key")
+	}
+	if req.body["dockerfile"] != "FROM busybox\nCMD [\"true\"]" {
+		t.Errorf("dockerfile body not sent verbatim: %+v", req.body)
+	}
+	if req.body["build_pack"] != "dockerfile" {
+		t.Errorf("dockerfile endpoint body build_pack = %v, want dockerfile", req.body["build_pack"])
+	}
+	// An inline Dockerfile is not base64-encoded (unlike a service compose).
+	if _, ok := req.body["git_repository"]; ok {
+		t.Errorf("inline dockerfile must not carry git fields: %+v", req.body)
+	}
+}
+
+func TestCreateApplicationPublicDirect(t *testing.T) {
+	srv, got := captureServer(t, http.StatusCreated, `{"uuid":"app-pub-uuid"}`)
+	uuid, err := newTestClient(t, srv.URL).CreateApplication(context.Background(), coolify.CreateApplicationRequest{
+		BuildPack:       "static",
+		ProjectUUID:     "proj-uuid",
+		ServerUUID:      "srv-uuid",
+		EnvironmentName: "production",
+		Name:            "site",
+		PortsExposes:    "80",
+		GitRepository:   "https://github.com/acme/site",
+		GitBranch:       "release",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uuid != "app-pub-uuid" {
+		t.Errorf("uuid = %q, want app-pub-uuid", uuid)
+	}
+	req := (*got)[0]
+	if req.method != http.MethodPost || req.path != "/api/v1/applications/public" {
+		t.Errorf("got %s %s, want POST /api/v1/applications/public", req.method, req.path)
+	}
+	if req.body["build_pack"] != "static" {
+		t.Errorf("public body build_pack = %v, want static", req.body["build_pack"])
+	}
+	if req.body["git_repository"] != "https://github.com/acme/site" || req.body["git_branch"] != "release" {
+		t.Errorf("public body missing git fields: %+v", req.body)
+	}
+	// environment_name only: v4 environments have no UUID to send.
+	if req.body["environment_name"] != "production" {
+		t.Errorf("environment_name not sent: %+v", req.body)
+	}
+	if _, ok := req.body["environment_uuid"]; ok {
+		t.Errorf("environment_uuid must be omitted (none resolvable): %+v", req.body)
+	}
+}
+
 func TestCreateApplicationNotCreatableMakesNoCall(t *testing.T) {
 	srv, got := captureServer(t, http.StatusCreated, `{}`)
 	_, err := newTestClient(t, srv.URL).CreateApplication(context.Background(), coolify.CreateApplicationRequest{

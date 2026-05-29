@@ -55,6 +55,12 @@
         "image": {
           "$ref": "#/$defs/ImageSpec"
         },
+        "dockerfile": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceSpec"
+        },
         "destination": {
           "$ref": "#/$defs/DestinationRef"
         },
@@ -90,8 +96,7 @@
       "type": "object",
       "required": [
         "build_pack",
-        "destination",
-        "port"
+        "destination"
       ]
     },
     "DestinationRef": {
@@ -180,6 +185,26 @@
       },
       "additionalProperties": false,
       "type": "object"
+    },
+    "SourceSpec": {
+      "properties": {
+        "git_repository": {
+          "type": "string"
+        },
+        "git_branch": {
+          "type": "string"
+        },
+        "ports_exposes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "git_repository",
+        "git_branch",
+        "ports_exposes"
+      ]
     }
   }
 }

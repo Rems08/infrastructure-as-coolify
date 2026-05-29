@@ -58,11 +58,21 @@ Environment name such as staging or production.
 Build pack to use.
 
 - **Required.**
-- Allowed values: `dockerfile`, `dockerimage`, `nixpacks`, `docker-compose`.
+- Allowed values: `dockerfile`, `dockerimage`, `nixpacks`, `docker-compose`, `static`, `railpack`.
 
 ### image
 
 Docker image (required when build_pack is dockerimage).
+
+
+### dockerfile
+
+Inline Dockerfile content for build_pack dockerfile in inline mode; mutually exclusive with source.
+
+
+### source
+
+Public git source for build_pack dockerfile/nixpacks/docker-compose/static/railpack.
 
 
 ### destination
@@ -78,9 +88,8 @@ Public URL such as https://app.example.com.
 
 ### port
 
-Container port exposed.
+Container port exposed (required for build_pack dockerimage).
 
-- **Required.**
 
 ### health_check
 
@@ -118,6 +127,26 @@ Docker image name including the registry path.
 ### tag
 
 Docker image tag.
+
+- **Required.**
+
+## SourceSpec
+
+### git_repository
+
+Public git repository URL (https:// http:// or git@).
+
+- **Required.**
+
+### git_branch
+
+Git branch to deploy.
+
+- **Required.**
+
+### ports_exposes
+
+Ports the build exposes such as 3000.
 
 - **Required.**
 

@@ -107,14 +107,15 @@ func TestUnmarshalYAML_RejectsLiteral(t *testing.T) {
 	}
 }
 
+// TestUnmarshalYAML_RejectsSOPS asserts ${sops:...} is rejected until SOPS sourcing ships.
 func TestUnmarshalYAML_RejectsSOPS(t *testing.T) {
 	var s Secret
 	err := s.parse("${sops:stripe.key}")
 	if err == nil {
-		t.Fatal("expected SOPS sourcing to be rejected in Wave 1")
+		t.Fatal("expected SOPS sourcing to be rejected")
 	}
-	if !strings.Contains(err.Error(), "not yet implemented") {
-		t.Errorf("error = %q, want mention of 'not yet implemented'", err)
+	if !strings.Contains(err.Error(), "SOPS sourcing is not supported") {
+		t.Errorf("error = %q, want mention of unsupported SOPS sourcing", err)
 	}
 }
 

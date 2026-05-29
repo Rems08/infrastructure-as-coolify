@@ -1,0 +1,37 @@
+# Plan on merge requests, apply on the default branch. Store COOLIFY_API_TOKEN and
+# CF_ACCESS_CLIENT_SECRET as masked, protected CI/CD variables (Settings → CI/CD →
+# Variables). Protect the apply job to the default branch so only reviewed changes reach
+# production.
+#
+# Beenaire consumers: a maintained template lands in
+# beenaire-ops/ci-templates/iac-coolify.yml; this file is the standalone reference.
+
+stages: [plan, apply]
+
+variables:
+  COOLIFY_API_URL: $COOLIFY_API_URL
+
+.iac_base: &iac_base
+  image: golang:1.25
+  before_script:
+    - go install github.com/Rems08/infrastructure-as-coolify/cmd/iac-coolify@latest
+    - export PATH="$PATH:$(go env GOPATH)/bin"
+
+plan:
+  <<: *iac_base
+  stage: plan
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - iac-coolify plan coolify/ --detailed-exitcode
+
+apply:
+  <<: *iac_base
+  stage: apply
+  environment: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  variables:
+    IAC_COOLIFY_ACTOR: $GITLAB_USER_LOGIN
+  script:
+    - iac-coolify apply coolify/ --auto-approve

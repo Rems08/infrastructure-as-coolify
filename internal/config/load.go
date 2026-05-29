@@ -211,6 +211,30 @@ func LoadApplications(target string) ([]resource.Application, error) {
 	return apps, nil
 }
 
+// LoadDatabases loads and validates every Database under target (a file or a directory).
+// Non-Database resources are skipped. It returns the first error found.
+func LoadDatabases(target string) ([]resource.Database, error) {
+	files, err := collectFiles(target)
+	if err != nil {
+		return nil, err
+	}
+	var dbs []resource.Database
+	for _, kf := range files {
+		if kf.kind != resource.KindDatabase {
+			continue
+		}
+		db, lErr := LoadDatabase(kf.path)
+		if lErr != nil {
+			return nil, lErr
+		}
+		if vErr := db.Validate(); vErr != nil {
+			return nil, fmt.Errorf("%s: %w", kf.path, vErr)
+		}
+		dbs = append(dbs, db)
+	}
+	return dbs, nil
+}
+
 // LoadProjects loads and validates every Project under target (a file or directory).
 // Non-Project resources are skipped. It returns the first error found.
 func LoadProjects(target string) ([]resource.Project, error) {

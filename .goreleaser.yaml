@@ -1,0 +1,99 @@
+version: 2
+
+project_name: iac-coolify
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: iac-coolify
+    main: ./cmd/iac-coolify
+    binary: iac-coolify
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}"
+
+# GHCR repository paths are lowercased by the registry, so the owner must be
+# spelled "rems08" here even though the GitHub org is "Rems08" — an uppercase
+# component makes the image reference unparseable.
+dockers_v2:
+  - id: image
+    dockerfile: Dockerfile
+    images:
+      - ghcr.io/rems08/infrastructure-as-coolify
+    tags:
+      - "{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.source: https://github.com/Rems08/infrastructure-as-coolify
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.licenses: CC0-1.0
+
+# Keyless signing: cosign mints a short-lived certificate from the workflow's
+# OIDC identity, so there is no long-lived key to manage. Each bundle is
+# self-contained (signature + certificate + transparency-log proof).
+signs:
+  - cmd: cosign
+    signature: "${artifact}.bundle"
+    args:
+      - sign-blob
+      - "--output-bundle=${signature}"
+      - "--yes"
+      - "${artifact}"
+    artifacts: archive
+    output: true
+
+docker_signs:
+  - cmd: cosign
+    args:
+      - sign
+      - "--yes"
+      - "${artifact}"
+    artifacts: all
+    output: true
+
+release:
+  github:
+    owner: Rems08
+    name: infrastructure-as-coolify
+  prerelease: auto
+
+changelog:
+  use: github-native

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"time"
 
 	retryablehttp "github.com/hashicorp/go-retryablehttp"
@@ -413,12 +414,31 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("coolify: API error %s: %s", e.Status, e.Body)
 }
 
+// credentialLeakPatterns scrub credentials a server might echo back into a response body
+// (e.g. a validation error that reflects the request headers). The body becomes part of an
+// error that callers wrap, log, and print, so any reflected token must never survive into it.
+var credentialLeakPatterns = []struct {
+	re   *regexp.Regexp
+	repl string
+}{
+	{re: regexp.MustCompile(`Bearer\s+[A-Za-z0-9._-]+`), repl: "Bearer [REDACTED]"},
+	{re: regexp.MustCompile(`(?i)CF-Access-Client-Secret:\s*\S+`), repl: "CF-Access-Client-Secret: [REDACTED]"},
+}
+
+// redactCredentials removes any reflected Bearer token or CF Access secret from an error body.
+func redactCredentials(body []byte) []byte {
+	for _, p := range credentialLeakPatterns {
+		body = p.re.ReplaceAll(body, []byte(p.repl))
+	}
+	return body
+}
+
 func newAPIError(resp *http.Response) *APIError {
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
 	return &APIError{
 		StatusCode: resp.StatusCode,
 		Status:     resp.Status,
-		Body:       string(body),
+		Body:       string(redactCredentials(body)),
 	}
 }
 

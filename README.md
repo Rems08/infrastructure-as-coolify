@@ -1,5 +1,11 @@
 # infrastructure-as-coolify
 
+[![CI](https://github.com/Rems08/infrastructure-as-coolify/actions/workflows/ci.yml/badge.svg)](https://github.com/Rems08/infrastructure-as-coolify/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Rems08/infrastructure-as-coolify)](https://github.com/Rems08/infrastructure-as-coolify/releases)
+[![License](https://img.shields.io/github/license/Rems08/infrastructure-as-coolify)](LICENSE)
+[![Go version](https://img.shields.io/github/go-mod/go-version/Rems08/infrastructure-as-coolify)](go.mod)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Rems08/infrastructure-as-coolify)](https://goreportcard.com/report/github.com/Rems08/infrastructure-as-coolify)
+
 > Declarative Infrastructure as Code for [Coolify](https://coolify.io) — YAML in, `plan`/`apply`/`destroy` out. No HCL, no state file, no magic.
 
 `iac-coolify` is a single-binary CLI that manages Coolify v4 resources declaratively, the

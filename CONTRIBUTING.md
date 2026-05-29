@@ -4,10 +4,10 @@ Thanks for considering a contribution! This is an OSS Go project (Apache-2.0).
 
 ## Ground rules
 
-- **Go 1.23 language target.** The `Makefile` pins toolchains per step (see the comment
-  there): build/test/vuln run on go1.25.10 (vuln-clean stdlib) and lint runs on go1.23.12
-  (golangci-lint v1.61 cannot read go ≥ 1.24 export data). All business logic lives in
-  `internal/`; `cmd/iac-coolify/` only parses the CLI.
+- **Single Go toolchain.** Every `make` step runs on the toolchain pinned in the `Makefile`
+  (`GOTOOLCHAIN`, currently go1.25.10 — the patch line `govulncheck` reports free of stdlib
+  advisories), analysed by golangci-lint v2. All business logic lives in `internal/`;
+  `cmd/iac-coolify/` only parses the CLI.
 - **`make verify` must be green before every push.** It runs `gofmt`, `go vet`,
   `golangci-lint` (strict preset), `go test -race -cover`, and `govulncheck`. Never bypass
   hooks with `--no-verify`; fix the root cause instead.
@@ -33,6 +33,13 @@ We follow [Effective Go](https://go.dev/doc/effective_go), the
 [Uber Go Style Guide](https://github.com/uber-go/guide/blob/master/style.md). In short: clear is
 better than clever, errors are values (`%w` wrapping), no panics in business code, structured
 logging via `log/slog`. Files over 500 lines are a smell — split them.
+
+## Dependencies
+
+New dependencies need justification (license + maintenance) before they land — open an issue
+first. Updates are automated: [`.github/dependabot.yml`](.github/dependabot.yml) opens weekly
+PRs for Go modules and GitHub Actions, grouping the `golang.org/x/*` and `aws-sdk-go-v2/*`
+trees so a single review covers each. `make verify` must stay green on every bump.
 
 ## Reporting security issues
 

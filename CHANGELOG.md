@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased] - 2026-05-29
 
+### Security (Wave 4.8)
+
+- `APIError` now scrubs any reflected credential from a non-2xx response body before it
+  becomes part of an error: a `Bearer <token>` or `CF-Access-Client-Secret: <secret>` echoed
+  by the server is replaced with `[REDACTED]`. The token itself is already an opaque
+  `Secret`, but a server-reflected copy in the body was a raw string until now.
+
+### Added (Wave 4.8)
+
+- Project hygiene: GitHub issue forms and a PR template, a `examples/` README index with
+  worked `minimal/` and `full-stack/` walkthroughs, README status badges (CI, release,
+  license, Go version, Go Report Card), a `// Package config` doc comment, and a
+  `dependabot.yml` grouping the `golang.org/x/*` and `aws-sdk-go-v2/*` update trees.
+- `internal/secrets` test coverage restored to 100% (JSON unmarshal error path and the
+  age-key-path edge cases).
+
 ### Added (Wave 4b)
 
 - SOPS + age secrets at rest: `value_secret: "${sops:path}"` is decrypted in memory from a

@@ -1,0 +1,45 @@
+# Plan on every pull request, apply on push to main. Secrets are passed as masked GitHub
+# Actions secrets; never echo them.
+name: deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      COOLIFY_API_URL: ${{ vars.COOLIFY_API_URL }}
+      COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+      # Cloudflare Access service-token headers, if your Coolify sits behind it.
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install iac-coolify
+        run: go install github.com/Rems08/infrastructure-as-coolify/cmd/iac-coolify@latest
+      - name: Plan
+        run: iac-coolify plan coolify/ --detailed-exitcode
+
+  apply:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      COOLIFY_API_URL: ${{ vars.COOLIFY_API_URL }}
+      COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      # Attributes the change in the audit log; falls back to USER, then "unknown".
+      IAC_COOLIFY_ACTOR: ${{ github.actor }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install iac-coolify
+        run: go install github.com/Rems08/infrastructure-as-coolify/cmd/iac-coolify@latest
+      - name: Apply
+        run: iac-coolify apply coolify/ --auto-approve

@@ -11,12 +11,15 @@ import (
 // AuditEntry is one append-only audit-log line. It records what was applied and the
 // sources of any secrets involved — never their resolved values.
 type AuditEntry struct {
-	Time      string   `json:"time"`
-	Operation string   `json:"operation"` // "apply"
-	Resource  string   `json:"resource"`  // e.g. "Application/beenaire/staging/api"
-	Op        string   `json:"op"`        // create | update | delete
-	Sources   []string `json:"sources,omitempty"`
-	DiffHash  string   `json:"diff_hash,omitempty"`
+	Time      string `json:"time"`
+	Operation string `json:"operation"` // "apply"
+	Resource  string `json:"resource"`  // e.g. "Application/beenaire/staging/api"
+	Op        string `json:"op"`        // create | update | delete
+	// Actor is who ran the apply: IAC_COOLIFY_ACTOR, else USER, else "unknown". Stamped by
+	// Record when unset so every entry attributes the change.
+	Actor    string   `json:"actor,omitempty"`
+	Sources  []string `json:"sources,omitempty"`
+	DiffHash string   `json:"diff_hash,omitempty"`
 	// ComposeHash is sha256 of a Service's decoded docker-compose content. The content
 	// itself is never logged: a compose file can hold inline secrets, and the audit log is
 	// a plain local file an operator might commit by accident.
@@ -28,6 +31,18 @@ type AuditEntry struct {
 type Auditor struct {
 	path string
 	now  func() time.Time
+}
+
+// auditActor resolves who ran the apply, preferring an explicit IAC_COOLIFY_ACTOR (set by
+// CI), then the shell USER, then "unknown" so an entry is never unattributed.
+func auditActor() string {
+	if a := os.Getenv("IAC_COOLIFY_ACTOR"); a != "" {
+		return a
+	}
+	if u := os.Getenv("USER"); u != "" {
+		return u
+	}
+	return "unknown"
 }
 
 // NewAuditor returns an Auditor writing to path. The parent directory is created on first
@@ -44,6 +59,9 @@ func (a *Auditor) Record(e AuditEntry) error {
 	}
 	if e.Operation == "" {
 		e.Operation = "apply"
+	}
+	if e.Actor == "" {
+		e.Actor = auditActor()
 	}
 	line, err := json.Marshal(e)
 	if err != nil {

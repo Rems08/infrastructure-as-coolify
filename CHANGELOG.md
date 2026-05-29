@@ -6,6 +6,29 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased] - 2026-05-29
 
+### Added (Wave 4)
+
+- `destroy` command: deletes the declared resources from a live Coolify instance in reverse
+  dependency order (applications and services, then environments, then projects). Only
+  resources that still exist remotely are deleted, so a repeated destroy is a no-op; a `404`
+  on delete is success. Supports `--dry-run`, `--target`, `--auto-approve`, the same exit
+  codes (`0`/`1`/`2`) and audit log as `apply`.
+- Environment interpolation (L1) extended to every visible (Param) string field —
+  `metadata`, `image`, `fqdn`, git `source`, inline `dockerfile`, `destination`, `limits` —
+  not just `env_vars` values. An unset reference is an error.
+- Audit log enriched with an `actor` field (`IAC_COOLIFY_ACTOR`, else `USER`, else
+  `unknown`), alongside the existing secret `sources` and `diff_hash`. The log stays `0600`.
+- Secrets documentation: a defence-layer overview and supply modes in the README, plus
+  CI templates ([`examples/ci/github-actions.yml`](examples/ci/github-actions.yml),
+  [`examples/ci/gitlab-ci.yml`](examples/ci/gitlab-ci.yml)).
+
+### Deferred (Wave 4)
+
+- SOPS + age secrets at rest (`value_secret: "${sops:path}"`): the `getsops/sops/v3`
+  library transitively pulls cloud-KMS crypto dependencies whose security fixes require a
+  newer Go toolchain than the pinned linter supports. `${sops:...}` is rejected at parse
+  time until the toolchain question is resolved. Use `${env:...}` meanwhile.
+
 ### Added (Wave 3.5b)
 
 - `Application` build packs extended from one to six creatable variants: `dockerimage`

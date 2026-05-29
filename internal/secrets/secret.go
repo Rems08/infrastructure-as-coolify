@@ -115,7 +115,7 @@ func (s *Secret) parse(raw string) error {
 		return nil
 	}
 	if strings.HasPrefix(raw, "${sops:") && strings.HasSuffix(raw, "}") {
-		return fmt.Errorf("secrets: SOPS sourcing not yet implemented (Wave 4 L2)")
+		return fmt.Errorf("secrets: SOPS sourcing is not supported yet; use ${env:NAME}")
 	}
 	return fmt.Errorf(
 		"secrets: literal value forbidden, use ${env:NAME} or ${sops:path}, got: %s",

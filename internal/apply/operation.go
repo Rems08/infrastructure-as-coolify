@@ -66,6 +66,22 @@ func CreateEnvironmentOp(e resource.Environment) Operation {
 	}
 }
 
+// DeleteProjectOp builds a delete operation for a Project.
+func DeleteProjectOp(p resource.Project) Operation {
+	return Operation{Op: OpDelete, Kind: resource.KindProject, Name: p.Metadata.Name, ProjectSpec: &p}
+}
+
+// DeleteEnvironmentOp builds a delete operation for an Environment.
+func DeleteEnvironmentOp(e resource.Environment) Operation {
+	return Operation{
+		Op:              OpDelete,
+		Kind:            resource.KindEnvironment,
+		Project:         e.Metadata.Project,
+		Name:            e.Metadata.Name,
+		EnvironmentSpec: &e,
+	}
+}
+
 // ApplicationOp builds an operation (create/update/delete) for an Application. For an
 // update, changes carries the field-level diff that drives the patch.
 func ApplicationOp(op Op, app resource.Application, changes []plan.Change) Operation {

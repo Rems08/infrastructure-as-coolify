@@ -34,6 +34,9 @@ func LoadApplication(path string) (resource.Application, error) {
 	if err := loadStrict(path, &app); err != nil {
 		return app, err
 	}
+	if err := interpolateApplicationFields(&app); err != nil {
+		return app, fmt.Errorf("%s: %w", path, err)
+	}
 	if err := interpolateEntries(app.Spec.EnvVars); err != nil {
 		return app, fmt.Errorf("%s: %w", path, err)
 	}
@@ -56,6 +59,9 @@ func LoadEnvVar(path string) (resource.EnvVar, error) {
 	if err := loadStrict(path, &ev); err != nil {
 		return ev, err
 	}
+	if err := interpolateStrings(&ev.Metadata.Name, &ev.Metadata.Project, &ev.Metadata.Environment); err != nil {
+		return ev, fmt.Errorf("%s: %w", path, err)
+	}
 	if err := interpolateEntries(ev.Spec.Vars); err != nil {
 		return ev, fmt.Errorf("%s: %w", path, err)
 	}
@@ -68,6 +74,9 @@ func LoadProject(path string) (resource.Project, error) {
 	if err := loadStrict(path, &p); err != nil {
 		return p, err
 	}
+	if err := interpolateStrings(&p.Metadata.Name, &p.Spec.Description); err != nil {
+		return p, fmt.Errorf("%s: %w", path, err)
+	}
 	return p, nil
 }
 
@@ -76,6 +85,9 @@ func LoadEnvironment(path string) (resource.Environment, error) {
 	var e resource.Environment
 	if err := loadStrict(path, &e); err != nil {
 		return e, err
+	}
+	if err := interpolateStrings(&e.Metadata.Name, &e.Metadata.Project, &e.Spec.Description); err != nil {
+		return e, fmt.Errorf("%s: %w", path, err)
 	}
 	return e, nil
 }
@@ -87,6 +99,9 @@ func LoadService(path string) (resource.Service, error) {
 	var s resource.Service
 	if err := loadStrict(path, &s); err != nil {
 		return s, err
+	}
+	if err := interpolateServiceFields(&s); err != nil {
+		return s, fmt.Errorf("%s: %w", path, err)
 	}
 	if err := interpolateEntries(s.Spec.EnvVars); err != nil {
 		return s, fmt.Errorf("%s: %w", path, err)

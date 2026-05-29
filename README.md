@@ -37,6 +37,10 @@ iac-coolify apply examples/full-project/ --dry-run # offline preview, mutates no
 iac-coolify apply examples/full-project/           # interactive confirmation prompt
 iac-coolify apply examples/full-project/ --auto-approve   # required in CI / non-interactive
 
+# Tear the resources down (reverse dependency order)
+iac-coolify destroy examples/full-project/ --dry-run      # offline preview, deletes nothing
+iac-coolify destroy examples/full-project/ --auto-approve # required in CI / non-interactive
+
 # Generate the reference documentation from the resource structs
 iac-coolify docs gen
 ```
@@ -54,12 +58,18 @@ resources changed before a failure — no rollback, the append-only `.iac-coolif
 records each applied operation and the sources of any secrets, never their values). Every
 write carries an `Idempotency-Key`, so a retried apply cannot create duplicates.
 
+`destroy` deletes the declared resources in reverse dependency order (applications and
+services first, then environments, then projects). Only resources that still exist remotely
+are deleted, so a repeated destroy is a no-op; a `404` on delete is treated as success. Like
+`apply`, it refuses a non-interactive session without `--auto-approve` and shares the same
+exit codes and audit log.
+
 ## Why
 
 | | `iac-coolify` | `coollabsio/coolify-cli` | `SierraJC/terraform-provider-coolify` |
 |---|---|---|---|
 | Model | declarative YAML | imperative wrapper | declarative HCL |
-| `plan`/`apply`/`destroy` | ✅ `plan` + `apply` (destroy on roadmap) | ❌ | ✅ |
+| `plan`/`apply`/`destroy` | ✅ `plan` + `apply` + `destroy` | ❌ | ✅ |
 | State file | stateless-first | n/a | tfstate required |
 | Native to Coolify | ✅ | ✅ | wraps Terraform |
 
@@ -115,14 +125,66 @@ See [`examples/`](examples/) and the generated [`docs/reference/`](docs/referenc
 (`project.md`, `environment.md`, `application.md`, `service.md`, `database.md`,
 `envvar.md` + JSON schemas).
 
-## Viewing secret values
+## Environment interpolation
 
-`iac-coolify` never reveals secret values, by design. To inspect a value:
+Any visible (Param) string field can reference an environment variable with
+`${env:VAR}` — `metadata` names, `image.name`/`image.tag`, `fqdn`, a git `source`, an
+inline `dockerfile`, `destination`, `limits`, and plain `env_vars` values. References are
+resolved at load time; an unset variable is an error (no silent fallback to `""`).
 
-- env-sourced: `printenv DATABASE_URL_STAGING`
-- SOPS-sourced (Wave 4+): `sops -d coolify/environments/staging/db.enc.yaml`
+```yaml
+metadata:
+  environment: "${env:DEPLOY_ENV}"
+spec:
+  image:
+    tag: "${env:IMAGE_TAG}"
+  fqdn: "https://${env:PUBLIC_HOST}"
+```
 
-Secrets stay scoped to the tool that owns them (your shell, SOPS).
+> Param fields are **visible** in plan/apply output once resolved. Never put a secret in a
+> Param field — use `value_secret` (below) for sensitive values.
+
+## Secrets management
+
+Secrets are an opaque `Secret` type: shown as `[REDACTED]` in every log, plan, apply output,
+error, and the state cache — only their origin (`${env:NAME}`) is ever displayed. A literal
+secret in YAML is rejected at parse time. The defences layer up:
+
+| Layer | What |
+|---|---|
+| **L0** Opaque `Secret` type | redaction by construction (the value has no visible accessor) |
+| **L1** Env interpolation | `${env:VAR}` in Param fields and `value_secret` |
+| **L4** `validate --strict` | flags a secret-like value mistakenly put in a visible `value` |
+| **L5** Redacted logs/plan | guaranteed by L0; no value can reach output |
+| **L6** Audit log | append-only `0600` log of who/what, with secret **origins** and a diff hash, never values |
+
+Three ways to supply a value today:
+
+```yaml
+env_vars:
+  - name: NODE_ENV
+    value: "production"                     # visible literal
+  - name: LOG_LEVEL
+    value: "${env:LOG_LEVEL}"               # visible, env-resolved
+  - name: DATABASE_URL
+    value_secret: "${env:DATABASE_URL}"     # secret, env-sourced, REDACTED
+```
+
+> **SOPS + age at rest (`value_secret: "${sops:path}"`)** is planned for a later release;
+> for now `${sops:...}` is rejected at parse time. Use `${env:...}`.
+
+### Viewing secret values
+
+`iac-coolify` never reveals secret values, by design. To inspect one, go to the source —
+e.g. `printenv DATABASE_URL`. Secrets stay scoped to the tool that owns them (your shell).
+
+## CI integration
+
+Pass `COOLIFY_API_TOKEN` (and any Cloudflare Access service-token headers) as **masked**
+CI secrets, and set `IAC_COOLIFY_ACTOR` so the audit log attributes the change. Run `plan`
+on pull/merge requests and `apply --auto-approve` on the protected default branch.
+Ready-to-copy workflows: [`examples/ci/github-actions.yml`](examples/ci/github-actions.yml)
+and [`examples/ci/gitlab-ci.yml`](examples/ci/gitlab-ci.yml).
 
 ## License
 

@@ -20,6 +20,56 @@ func TestValueEquals(t *testing.T) {
 	}
 }
 
+func TestUnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name       string
+		in         string
+		wantZero   bool
+		wantReveal string
+	}{
+		{name: "literal", in: `"s3cr3t-runtime"`, wantZero: false, wantReveal: "s3cr3t-runtime"},
+		{name: "null", in: `null`, wantZero: true},
+		{name: "empty", in: `""`, wantZero: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var s Secret
+			if err := json.Unmarshal([]byte(tt.in), &s); err != nil {
+				t.Fatalf("UnmarshalJSON(%s): %v", tt.in, err)
+			}
+			if s.IsZero() != tt.wantZero {
+				t.Errorf("IsZero() = %v, want %v", s.IsZero(), tt.wantZero)
+			}
+			if s.Origin() != "" {
+				t.Errorf("remote secret must have no origin, got %q", s.Origin())
+			}
+			if !tt.wantZero && s.Reveal() != tt.wantReveal {
+				t.Errorf("Reveal() = %q, want %q", s.Reveal(), tt.wantReveal)
+			}
+		})
+	}
+}
+
+func TestUnmarshalJSON_staysRedacted(t *testing.T) {
+	var s Secret
+	if err := json.Unmarshal([]byte(`"top-secret"`), &s); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got := s.String(); got != "[REDACTED]" {
+		t.Errorf("String() = %q, want [REDACTED]", got)
+	}
+	out, err := json.Marshal(s)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if string(out) != `"[REDACTED]"` {
+		t.Errorf("MarshalJSON() = %s, want \"[REDACTED]\"", out)
+	}
+	if strings.Contains(s.String()+string(out), "top-secret") {
+		t.Error("value leaked through a string representation")
+	}
+}
+
 func TestNewFromEnv(t *testing.T) {
 	tests := []struct {
 		name    string

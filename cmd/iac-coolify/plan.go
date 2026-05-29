@@ -81,6 +81,11 @@ func runPlan(ctx context.Context, cmd *cobra.Command, opts planOptions) error {
 		log.WarnContext(ctx, "no Coolify URL/token configured; planning offline (all resources treated as new)")
 	}
 
+	dbs, err := config.LoadDatabases(opts.target)
+	if err != nil {
+		return err
+	}
+
 	var p plan.Plan
 	for _, app := range apps {
 		actual, aErr := remoteApplication(ctx, client, rmap, app)
@@ -88,6 +93,13 @@ func runPlan(ctx context.Context, cmd *cobra.Command, opts planOptions) error {
 			return aErr
 		}
 		p.Add(plan.FromApplication(app), actual)
+	}
+	for _, db := range dbs {
+		actual, aErr := remoteDatabase(ctx, client, rmap, db)
+		if aErr != nil {
+			return aErr
+		}
+		p.Add(plan.FromDatabase(db), actual)
 	}
 
 	if err := writePlan(cmd, format, p); err != nil {
@@ -142,6 +154,25 @@ func remoteApplication(ctx context.Context, client *coolify.Client, rmap state.M
 		return nil, err
 	}
 	r := plan.FromRemoteApplication(live)
+	return &r, nil
+}
+
+// remoteDatabase returns the live projection of db, or nil when it does not exist remotely
+// (or when planning offline with a nil client). Databases are resolved by name alone (the
+// resolver keys them that way), so the lookup carries no project or environment.
+func remoteDatabase(ctx context.Context, client *coolify.Client, rmap state.Map, db resource.Database) (*plan.Resource, error) {
+	if client == nil {
+		return nil, nil
+	}
+	uuid, ok := rmap.Lookup(state.ResourceKey{Kind: resource.KindDatabase, Name: db.Metadata.Name})
+	if !ok {
+		return nil, nil
+	}
+	live, err := client.GetDatabase(ctx, uuid)
+	if err != nil {
+		return nil, err
+	}
+	r := plan.FromRemoteDatabase(live)
 	return &r, nil
 }
 

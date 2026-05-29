@@ -1,0 +1,26 @@
+[
+  {
+    "uuid": "REDACTED-uuid-1",
+    "name": "redis-database-restaurant-core-api-staging",
+    "type": "standalone-redis",
+    "status": "running:healthy",
+    "is_public": false,
+    "environment_id": 4
+  },
+  {
+    "uuid": "REDACTED-uuid-2",
+    "name": "pg-restaurant-core-api-staging",
+    "type": "standalone-postgresql",
+    "status": "running:healthy",
+    "is_public": false,
+    "environment_id": 4
+  },
+  {
+    "uuid": "REDACTED-uuid-3",
+    "name": "redis-database-restaurant-core-api",
+    "type": "standalone-redis",
+    "status": "running:healthy",
+    "is_public": false,
+    "environment_id": 1
+  }
+]

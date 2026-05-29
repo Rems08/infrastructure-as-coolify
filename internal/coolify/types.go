@@ -63,6 +63,86 @@ type ServerResource struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
+// Database mirrors the JSON object returned by GET /databases/{uuid}.
+//
+// The OpenAPI v4 spec marks this endpoint's response as a string placeholder
+// ("Content is very complex. Will be implemented later."), but the live API returns a
+// fully typed object equivalent to GET /applications/{uuid}. The shape is decoded against
+// the observed runtime response (testdata/database-singular.json, observed 2026-05-29) and
+// tracked upstream at https://github.com/coollabsio/coolify/issues/10449.
+//
+// Credential fields (passwords and the connection URLs that embed them) are typed
+// secrets.Secret so a value read back from the API is opaque the moment it is decoded:
+// it never reaches a log, plan output, or error in clear text.
+type Database struct {
+	UUID         string `json:"uuid"`
+	Name         string `json:"name"`
+	ConfigHash   string `json:"config_hash"`
+	DatabaseType string `json:"database_type"`
+	Description  string `json:"description"`
+	Image        string `json:"image"`
+
+	IsPublic   bool   `json:"is_public"`
+	PublicPort int    `json:"public_port"`
+	EnableSSL  bool   `json:"enable_ssl"`
+	SSLMode    string `json:"ssl_mode"`
+
+	EnvironmentID int `json:"environment_id"`
+
+	LimitsCPUShares         int    `json:"limits_cpu_shares"`
+	LimitsCPUs              string `json:"limits_cpus"`
+	LimitsCPUset            string `json:"limits_cpuset"`
+	LimitsMemory            string `json:"limits_memory"`
+	LimitsMemoryReservation string `json:"limits_memory_reservation"`
+	LimitsMemorySwap        string `json:"limits_memory_swap"`
+	LimitsMemorySwappiness  int    `json:"limits_memory_swappiness"`
+
+	PostgresUser           string         `json:"postgres_user"`
+	PostgresDB             string         `json:"postgres_db"`
+	PostgresConf           string         `json:"postgres_conf"`
+	PostgresHostAuthMethod string         `json:"postgres_host_auth_method"`
+	PostgresInitDBArgs     string         `json:"postgres_initdb_args"`
+	PostgresPassword       secrets.Secret `json:"postgres_password"`
+
+	RedisPassword           secrets.Secret `json:"redis_password"`
+	MySQLUser               string         `json:"mysql_user"`
+	MySQLDatabase           string         `json:"mysql_database"`
+	MySQLPassword           secrets.Secret `json:"mysql_password"`
+	MySQLRootPassword       secrets.Secret `json:"mysql_root_password"`
+	MariaDBUser             string         `json:"mariadb_user"`
+	MariaDBDatabase         string         `json:"mariadb_database"`
+	MariaDBPassword         secrets.Secret `json:"mariadb_password"`
+	MariaDBRootPassword     secrets.Secret `json:"mariadb_root_password"`
+	MongoInitDBRootUsername string         `json:"mongo_initdb_root_username"`
+	MongoInitDBRootPassword secrets.Secret `json:"mongo_initdb_root_password"`
+	MongoInitDBDatabase     string         `json:"mongo_initdb_database"`
+	KeyDBPassword           secrets.Secret `json:"keydb_password"`
+	ClickhouseAdminUser     string         `json:"clickhouse_admin_user"`
+	ClickhouseAdminPassword secrets.Secret `json:"clickhouse_admin_password"`
+	DragonflyPassword       secrets.Secret `json:"dragonfly_password"`
+
+	InternalDBURL secrets.Secret `json:"internal_db_url"`
+	ExternalDBURL secrets.Secret `json:"external_db_url"`
+
+	Status       string `json:"status"`
+	ServerStatus bool   `json:"server_status"`
+	LastOnlineAt string `json:"last_online_at"`
+	RestartCount int    `json:"restart_count"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
+
+	Destination DatabaseDestination `json:"destination"`
+}
+
+// DatabaseDestination is the subset of the nested destination object the reconciler reads:
+// the network a database is attached to. The full object also carries the server and its
+// settings, which iac-coolify does not consume.
+type DatabaseDestination struct {
+	UUID    string `json:"uuid"`
+	Name    string `json:"name"`
+	Network string `json:"network"`
+}
+
 // CreateResponse is the shared 201 body of the create endpoints: a single uuid.
 type CreateResponse struct {
 	UUID string `json:"uuid"`

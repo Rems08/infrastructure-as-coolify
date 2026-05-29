@@ -12,6 +12,7 @@ type DeleteInput struct {
 	Environments []resource.Environment
 	Applications []resource.Application
 	Services     []resource.Service
+	Databases    []resource.Database
 	// Resolved maps logical keys to live identifiers. A resource absent from it does not
 	// exist remotely and is skipped — unless AssumePresent is set.
 	Resolved state.Map
@@ -36,6 +37,11 @@ func (in DeleteInput) DeleteOperations() []Operation {
 	for _, svc := range in.Services {
 		if in.includes(in.Only, svc.Metadata.Name, serviceKey(svc.Metadata.Project, svc.Metadata.Environment, svc.Metadata.Name)) {
 			ops = append(ops, ServiceOp(OpDelete, svc, "", nil))
+		}
+	}
+	for _, db := range in.Databases {
+		if in.includes(in.Only, db.Metadata.Name, databaseKey(db.Metadata.Name)) {
+			ops = append(ops, DatabaseOp(OpDelete, db, nil))
 		}
 	}
 	for _, e := range in.Environments {

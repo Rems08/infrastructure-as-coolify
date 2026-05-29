@@ -38,6 +38,7 @@ type Operation struct {
 	EnvironmentSpec *resource.Environment
 	ApplicationSpec *resource.Application
 	ServiceSpec     *resource.Service
+	DatabaseSpec    *resource.Database
 
 	// ServiceComposeRaw is the decoded docker-compose content for a compose_path Service,
 	// read and path-checked at load time. It is empty for a one-click (type) Service and
@@ -112,6 +113,20 @@ func ServiceOp(op Op, svc resource.Service, composeRaw string, changes []plan.Ch
 	}
 }
 
+// DatabaseOp builds an operation (create/update/delete) for a Database. For an update,
+// changes carries the field-level diff that drives the patch.
+func DatabaseOp(op Op, db resource.Database, changes []plan.Change) Operation {
+	return Operation{
+		Op:           op,
+		Kind:         resource.KindDatabase,
+		Project:      db.Metadata.Project,
+		Environment:  db.Metadata.Environment,
+		Name:         db.Metadata.Name,
+		DatabaseSpec: &db,
+		Changes:      changes,
+	}
+}
+
 // resourceLabel renders an operation's target as "Kind/project/environment/name",
 // skipping empty coordinates. Used in audit records and error messages.
 func resourceLabel(op Operation) string {
@@ -125,9 +140,15 @@ func resourceLabel(op Operation) string {
 }
 
 // secretSources returns the source declarations of every Secret an operation references
-// (e.g. "${env:DATABASE_URL}"), never their values. Applications and Services carry
-// secrets via their inline env vars.
+// (e.g. "${env:DATABASE_URL}"), never their values. Applications and Services carry secrets
+// via their inline env vars; a Database carries its single credential password.
 func secretSources(op Operation) []string {
+	if op.DatabaseSpec != nil {
+		if op.DatabaseSpec.Spec.Password.IsZero() {
+			return nil
+		}
+		return []string{op.DatabaseSpec.Spec.Password.Origin()}
+	}
 	var entries []resource.EnvVarEntry
 	switch {
 	case op.ApplicationSpec != nil:
@@ -162,4 +183,10 @@ func serviceKey(project, environment, name string) state.ResourceKey {
 
 func serverKey(name string) state.ResourceKey {
 	return state.ResourceKey{Kind: state.KindServer, Name: name}
+}
+
+// databaseKey is name-only: the resolver discovers standalone databases by name across all
+// servers and keys them that way (their project and environment are not in the live shape).
+func databaseKey(name string) state.ResourceKey {
+	return state.ResourceKey{Kind: resource.KindDatabase, Name: name}
 }

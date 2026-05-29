@@ -21,6 +21,9 @@ type recordedCall struct {
 	appReq      coolify.CreateApplicationRequest
 	updReq      coolify.UpdateApplicationRequest
 	svcReq      coolify.CreateServiceRequest
+	dbReq       coolify.DatabaseCreateRequest
+	dbUpdReq    coolify.UpdateDatabaseRequest
+	delOpts     coolify.DeleteDatabaseOptions
 	envs        []coolify.ServiceEnvVar
 	uuid        string
 }
@@ -90,6 +93,21 @@ func (m *mockClient) DeleteService(_ context.Context, uuid string) error {
 func (m *mockClient) BulkUpdateServiceEnvs(_ context.Context, serviceUUID string, envs []coolify.ServiceEnvVar) error {
 	m.calls = append(m.calls, recordedCall{method: "BulkUpdateServiceEnvs", uuid: serviceUUID, envs: envs})
 	return m.fail("BulkUpdateServiceEnvs")
+}
+
+func (m *mockClient) CreateDatabase(_ context.Context, req coolify.DatabaseCreateRequest) (string, error) {
+	m.calls = append(m.calls, recordedCall{method: "CreateDatabase", dbReq: req})
+	return "db-uuid", m.fail("CreateDatabase")
+}
+
+func (m *mockClient) UpdateDatabase(_ context.Context, uuid string, req coolify.UpdateDatabaseRequest) error {
+	m.calls = append(m.calls, recordedCall{method: "UpdateDatabase", uuid: uuid, dbUpdReq: req})
+	return m.fail("UpdateDatabase")
+}
+
+func (m *mockClient) DeleteDatabase(_ context.Context, uuid string, opts coolify.DeleteDatabaseOptions) error {
+	m.calls = append(m.calls, recordedCall{method: "DeleteDatabase", uuid: uuid, delOpts: opts})
+	return m.fail("DeleteDatabase")
 }
 
 func dockerimageApp() resource.Application {

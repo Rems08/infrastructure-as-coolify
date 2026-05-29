@@ -27,6 +27,9 @@ type Client interface {
 	UpdateService(ctx context.Context, uuid string, req coolify.UpdateServiceRequest) error
 	DeleteService(ctx context.Context, uuid string) error
 	BulkUpdateServiceEnvs(ctx context.Context, serviceUUID string, envs []coolify.ServiceEnvVar) error
+	CreateDatabase(ctx context.Context, req coolify.DatabaseCreateRequest) (string, error)
+	UpdateDatabase(ctx context.Context, uuid string, req coolify.UpdateDatabaseRequest) error
+	DeleteDatabase(ctx context.Context, uuid string, opts coolify.DeleteDatabaseOptions) error
 }
 
 // Summary counts the outcome of an apply run.
@@ -86,6 +89,8 @@ func (e *Engine) applyOne(ctx context.Context, op Operation) error {
 		return e.applyApplication(ctx, op)
 	case resource.KindService:
 		return e.applyService(ctx, op)
+	case resource.KindDatabase:
+		return e.applyDatabase(ctx, op)
 	default:
 		return fmt.Errorf("unsupported kind %q", op.Kind)
 	}
@@ -211,6 +216,36 @@ func (e *Engine) applyServiceEnvs(ctx context.Context, uuid string, op Operation
 	return e.client.BulkUpdateServiceEnvs(ctx, uuid, envs)
 }
 
+func (e *Engine) applyDatabase(ctx context.Context, op Operation) error {
+	switch op.Op {
+	case OpCreate:
+		req, err := e.databaseCreateRequest(op)
+		if err != nil {
+			return err
+		}
+		uuid, err := e.client.CreateDatabase(ctx, req)
+		if err != nil {
+			return err
+		}
+		e.resolved[databaseKey(op.Name)] = uuid
+		return nil
+	case OpUpdate:
+		uuid, ok := e.resolved.Lookup(databaseKey(op.Name))
+		if !ok {
+			return fmt.Errorf("database not resolved")
+		}
+		return e.client.UpdateDatabase(ctx, uuid, updateDatabaseRequestFromChanges(op))
+	case OpDelete:
+		uuid, ok := e.resolved.Lookup(databaseKey(op.Name))
+		if !ok {
+			return nil
+		}
+		return e.client.DeleteDatabase(ctx, uuid, coolify.DefaultDeleteDatabaseOptions())
+	default:
+		return fmt.Errorf("unsupported op %q for database", op.Op)
+	}
+}
+
 // serviceCreateRequest builds the create body from the desired spec and the resolved
 // parent UUIDs (project and destination server). EnvironmentUUID is left empty: v4
 // environments have no UUID and are addressed by name, so only environment_name is sent.
@@ -303,6 +338,91 @@ func updateRequestFromChanges(op Operation) coolify.UpdateApplicationRequest {
 			req.DockerRegistryImageName = c.New
 		case "image.tag":
 			req.DockerRegistryImageTag = c.New
+		}
+	}
+	return req
+}
+
+// databaseCommon resolves the parent UUIDs and builds the create-body fields shared by
+// every engine.
+func (e *Engine) databaseCommon(db resource.Database) (coolify.CreateDatabaseCommon, error) {
+	projUUID, ok := e.resolved.Lookup(projectKey(db.Metadata.Project))
+	if !ok {
+		return coolify.CreateDatabaseCommon{}, fmt.Errorf("project %q not resolved", db.Metadata.Project)
+	}
+	srvUUID, ok := e.resolved.Lookup(serverKey(db.Spec.Destination.Server))
+	if !ok {
+		return coolify.CreateDatabaseCommon{}, fmt.Errorf("server %q not resolved", db.Spec.Destination.Server)
+	}
+	common := coolify.CreateDatabaseCommon{
+		ServerUUID:      srvUUID,
+		ProjectUUID:     projUUID,
+		EnvironmentName: db.Metadata.Environment,
+		Name:            db.Metadata.Name,
+		Image:           db.Spec.Image,
+		IsPublic:        db.Spec.Public,
+		PublicPort:      db.Spec.PublicPort,
+	}
+	if db.Spec.Limits != nil {
+		common.LimitsCPUShares = db.Spec.Limits.CPUShares
+		common.LimitsMemory = db.Spec.Limits.Memory
+	}
+	return common, nil
+}
+
+// databaseCreateRequest builds the engine-specific create request, mapping the single
+// declared password to the engine's primary credential field. MongoDB exposes no
+// create-time password field in the pinned v4 spec, so its password is not sent on create.
+func (e *Engine) databaseCreateRequest(op Operation) (coolify.DatabaseCreateRequest, error) {
+	db := *op.DatabaseSpec
+	common, err := e.databaseCommon(db)
+	if err != nil {
+		return nil, err
+	}
+	pw := db.Spec.Password
+	switch db.Spec.Engine {
+	case "postgresql":
+		return coolify.CreateDatabasePostgresqlRequest{CreateDatabaseCommon: common, PostgresPassword: pw}, nil
+	case "mysql":
+		return coolify.CreateDatabaseMysqlRequest{CreateDatabaseCommon: common, MySQLPassword: pw}, nil
+	case "mariadb":
+		return coolify.CreateDatabaseMariadbRequest{CreateDatabaseCommon: common, MariaDBPassword: pw}, nil
+	case "mongodb":
+		return coolify.CreateDatabaseMongodbRequest{CreateDatabaseCommon: common}, nil
+	case "redis":
+		return coolify.CreateDatabaseRedisRequest{CreateDatabaseCommon: common, RedisPassword: pw}, nil
+	case "keydb":
+		return coolify.CreateDatabaseKeydbRequest{CreateDatabaseCommon: common, KeyDBPassword: pw}, nil
+	case "dragonfly":
+		return coolify.CreateDatabaseDragonflyRequest{CreateDatabaseCommon: common, DragonflyPassword: pw}, nil
+	case "clickhouse":
+		return coolify.CreateDatabaseClickhouseRequest{CreateDatabaseCommon: common, ClickhouseAdminPassword: pw}, nil
+	default:
+		return nil, fmt.Errorf("unsupported database engine %q", db.Spec.Engine)
+	}
+}
+
+// updateDatabaseRequestFromChanges maps a database's changed diff fields to the PATCH body.
+func updateDatabaseRequestFromChanges(op Operation) coolify.UpdateDatabaseRequest {
+	prefix := op.Kind + "." + op.Name + "."
+	var req coolify.UpdateDatabaseRequest
+	for _, c := range op.Changes {
+		switch strings.TrimPrefix(c.Path, prefix) {
+		case "image":
+			req.Image = c.New
+		case "public":
+			b := c.New == "true"
+			req.IsPublic = &b
+		case "public_port":
+			if n, err := strconv.Atoi(c.New); err == nil {
+				req.PublicPort = n
+			}
+		case "limits.cpu_shares":
+			if n, err := strconv.Atoi(c.New); err == nil {
+				req.LimitsCPUShares = n
+			}
+		case "limits.memory":
+			req.LimitsMemory = c.New
 		}
 	}
 	return req

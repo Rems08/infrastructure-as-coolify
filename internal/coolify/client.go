@@ -243,6 +243,24 @@ func (c *Client) GetApplication(ctx context.Context, uuid string) (Application, 
 	return app, nil
 }
 
+// GetDatabase fetches a single database by UUID via GET /api/v1/databases/{uuid}.
+//
+// The OpenAPI v4 spec marks this endpoint's response as a string placeholder; the live
+// API returns a fully typed object, decoded here against the observed runtime shape (see
+// the Database type and testdata/database-singular.json, observed 2026-05-29) and tracked
+// upstream at https://github.com/coollabsio/coolify/issues/10449.
+func (c *Client) GetDatabase(ctx context.Context, uuid string) (Database, error) {
+	var db Database
+	req, err := c.newRequest(ctx, "/databases/"+uuid)
+	if err != nil {
+		return db, err
+	}
+	if err := c.getJSON(req, &db, "GET database "+uuid); err != nil {
+		return db, err
+	}
+	return db, nil
+}
+
 // doJSON performs a mutating req, treating any 2xx as success. When dst is non-nil the
 // response body is decoded into it; a nil dst discards the body (e.g. delete). A non-2xx
 // response becomes an *APIError.

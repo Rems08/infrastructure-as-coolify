@@ -177,6 +177,79 @@ func TestGetServerResources_OK(t *testing.T) {
 	}
 }
 
+func TestGetDatabase_decodesObservedShape(t *testing.T) {
+	golden, err := os.ReadFile(filepath.Join("testdata", "database-singular.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(golden)
+	}))
+	defer srv.Close()
+
+	db, err := newTestClient(t, srv.URL).GetDatabase(context.Background(), "db-abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != "/api/v1/databases/db-abc" {
+		t.Errorf("path = %q, want /api/v1/databases/db-abc", gotPath)
+	}
+
+	// Visible (non-secret) fields decode as a typed object, not an opaque blob.
+	if db.Name != "pg-restaurant-core-api-staging" {
+		t.Errorf("Name = %q", db.Name)
+	}
+	if db.DatabaseType != "standalone-postgresql" {
+		t.Errorf("DatabaseType = %q", db.DatabaseType)
+	}
+	if db.Image != "postgres:18-alpine" {
+		t.Errorf("Image = %q", db.Image)
+	}
+	if db.IsPublic {
+		t.Error("IsPublic = true, want false")
+	}
+	if db.PublicPort != 5432 {
+		t.Errorf("PublicPort = %d, want 5432", db.PublicPort)
+	}
+	if db.SSLMode != "require" {
+		t.Errorf("SSLMode = %q", db.SSLMode)
+	}
+	if db.EnvironmentID != 4 {
+		t.Errorf("EnvironmentID = %d, want 4", db.EnvironmentID)
+	}
+	if db.LimitsCPUShares != 1024 {
+		t.Errorf("LimitsCPUShares = %d, want 1024", db.LimitsCPUShares)
+	}
+	if db.LimitsMemory != "0" {
+		t.Errorf("LimitsMemory = %q, want 0", db.LimitsMemory)
+	}
+	if db.Destination.Network != "coolify" {
+		t.Errorf("Destination.Network = %q, want coolify", db.Destination.Network)
+	}
+
+	// Credential fields decode into opaque secrets: present, redacted, never in clear.
+	if db.PostgresPassword.IsZero() {
+		t.Error("postgres_password should decode into a non-zero Secret")
+	}
+	if db.InternalDBURL.IsZero() {
+		t.Error("internal_db_url should decode into a non-zero Secret")
+	}
+	for _, s := range []secrets.Secret{db.PostgresPassword, db.InternalDBURL} {
+		if s.String() != "[REDACTED]" {
+			t.Errorf("credential String() = %q, want [REDACTED]", s.String())
+		}
+	}
+	blob := db.PostgresPassword.String() + db.InternalDBURL.String() + db.Name + db.Image
+	for _, leak := range []string{"REDACTED-postgres-password", "REDACTED-internal-db-url-contains-password"} {
+		if strings.Contains(blob, leak) {
+			t.Errorf("credential value %q leaked through a string representation", leak)
+		}
+	}
+}
+
 func TestGetServerResources_Unauthorized(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)

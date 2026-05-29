@@ -4,7 +4,22 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-05-29
+## [Unreleased]
+
+## [0.1.0-rc.1] - 2026-05-29
+
+This is the first tagged release: signed, multi-arch binaries and container image with
+SLSA build level 3 provenance. It aggregates every change below.
+
+### Added (release pipeline)
+
+- Reproducible release pipeline: `goreleaser` cross-compiles `linux`/`darwin`/`windows`
+  for `amd64`/`arm64` (Windows arm64 excluded) into archives with a SHA-256 `checksums.txt`,
+  and publishes a multi-arch container image to `ghcr.io/rems08/infrastructure-as-coolify`
+  (`linux/amd64`, `linux/arm64`). Each archive is signed with cosign keyless and the build
+  emits SLSA build level 3 provenance; see "Verifying release signatures" in the README.
+- `make build` embeds the version via `-ldflags`, and `make release-dry` runs the full
+  pipeline locally (archives plus local images, no signing or publishing).
 
 ### Security (Wave 4.8)
 
@@ -151,4 +166,5 @@ All notable changes to this project are documented here. The format is based on
   architecture test that fails when docs drift from the structs.
 - State cache type that refuses to marshal if it ever gains a `Secret` field.
 
-[Unreleased]: https://github.com/Rems08/infrastructure-as-coolify/commits/main
+[Unreleased]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.0-rc.1...HEAD
+[0.1.0-rc.1]: https://github.com/Rems08/infrastructure-as-coolify/releases/tag/v0.1.0-rc.1

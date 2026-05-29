@@ -271,3 +271,17 @@ func TestCheckAgeKeyFilePermissionsAbsent(t *testing.T) {
 		t.Errorf("absent key file must not error (SOPS_AGE_KEY may carry the key): %v", err)
 	}
 }
+
+// TestAgeKeyFilePathUnresolvable exercises the branch where neither SOPS_AGE_KEY_FILE nor a
+// home directory is available: the path is unknown, so the permission check is skipped (SOPS
+// may still resolve the key from the SOPS_AGE_KEY env var).
+func TestAgeKeyFilePathUnresolvable(t *testing.T) {
+	t.Setenv("SOPS_AGE_KEY_FILE", "")
+	t.Setenv("HOME", "") // os.UserHomeDir errors on a non-Windows host with no $HOME
+	if got := ageKeyFilePath(); got != "" {
+		t.Errorf("ageKeyFilePath() = %q, want empty when no override and no home dir", got)
+	}
+	if err := checkAgeKeyFilePermissions(); err != nil {
+		t.Errorf("unresolvable key path must skip the permission check, got: %v", err)
+	}
+}

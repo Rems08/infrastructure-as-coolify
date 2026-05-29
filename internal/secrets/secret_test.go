@@ -50,6 +50,22 @@ func TestUnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestUnmarshalJSON_invalid(t *testing.T) {
+	tests := []struct{ name, in string }{
+		{name: "number is not a string", in: `123`},
+		{name: "object is not a string", in: `{"k":"v"}`},
+		{name: "truncated", in: `"unterminated`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var s Secret
+			if err := json.Unmarshal([]byte(tt.in), &s); err == nil {
+				t.Errorf("UnmarshalJSON(%s): want error, got nil", tt.in)
+			}
+		})
+	}
+}
+
 func TestUnmarshalJSON_staysRedacted(t *testing.T) {
 	var s Secret
 	if err := json.Unmarshal([]byte(`"top-secret"`), &s); err != nil {

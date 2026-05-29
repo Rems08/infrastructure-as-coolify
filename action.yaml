@@ -33,7 +33,7 @@ inputs:
 
 runs:
   using: docker
-  image: .github/action/Dockerfile
+  image: ./.github/action/Dockerfile
   args:
     - ${{ inputs.command }}
     - ${{ inputs.path }}

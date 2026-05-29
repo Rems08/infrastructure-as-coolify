@@ -5,6 +5,9 @@
 [![License](https://img.shields.io/github/license/Rems08/infrastructure-as-coolify)](LICENSE)
 [![Go version](https://img.shields.io/github/go-mod/go-version/Rems08/infrastructure-as-coolify)](go.mod)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Rems08/infrastructure-as-coolify)](https://goreportcard.com/report/github.com/Rems08/infrastructure-as-coolify)
+[![GHCR](https://img.shields.io/badge/ghcr.io-Rems08%2Finfrastructure--as--coolify-blue?logo=docker)](https://github.com/Rems08/infrastructure-as-coolify/pkgs/container/infrastructure-as-coolify)
+[![cosign](https://img.shields.io/badge/cosign-keyless-2ea44f?logo=sigstore)](#verifying-release-signatures)
+[![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 
 > Declarative Infrastructure as Code for [Coolify](https://coolify.io) — YAML in, `plan`/`apply`/`destroy` out. No HCL, no state file, no magic.
 
@@ -69,6 +72,47 @@ services first, then environments, then projects). Only resources that still exi
 are deleted, so a repeated destroy is a no-op; a `404` on delete is treated as success. Like
 `apply`, it refuses a non-interactive session without `--auto-approve` and shares the same
 exit codes and audit log.
+
+## Install
+
+Download a binary for your platform from the [releases page](https://github.com/Rems08/infrastructure-as-coolify/releases),
+or pull the container image:
+
+```sh
+docker pull ghcr.io/rems08/infrastructure-as-coolify:latest
+docker run --rm ghcr.io/rems08/infrastructure-as-coolify version
+```
+
+Images are multi-arch (`linux/amd64`, `linux/arm64`). Replace `:latest` with a version such
+as `:0.1.0-rc.1` to pin a release.
+
+## Verifying release signatures
+
+Every release is signed with [cosign](https://docs.sigstore.dev/cosign/overview/) keyless
+(no long-lived key — the signature is bound to this repository's GitHub Actions identity) and
+ships [SLSA build level 3](https://slsa.dev/spec/v1.0/levels#build-l3) provenance. Set
+`TAG` to the release you downloaded, e.g. `TAG=v0.1.0-rc.1`.
+
+```sh
+# Verify a downloaded archive against its cosign bundle
+cosign verify-blob \
+  --bundle iac-coolify_${TAG#v}_linux_amd64.tar.gz.bundle \
+  --certificate-identity-regexp 'https://github.com/Rems08/infrastructure-as-coolify/.github/workflows/release.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  iac-coolify_${TAG#v}_linux_amd64.tar.gz
+
+# Verify the container image
+cosign verify ghcr.io/rems08/infrastructure-as-coolify:${TAG#v} \
+  --certificate-identity-regexp 'https://github.com/Rems08/infrastructure-as-coolify/.github/workflows/release.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+# Verify the SLSA provenance attached to the release
+slsa-verifier verify-artifact \
+  --provenance-path multiple.intoto.jsonl \
+  --source-uri github.com/Rems08/infrastructure-as-coolify \
+  --source-tag "$TAG" \
+  iac-coolify_${TAG#v}_linux_amd64.tar.gz
+```
 
 ## Why
 

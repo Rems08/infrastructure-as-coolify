@@ -74,7 +74,7 @@ signs:
     signature: "${artifact}.bundle"
     args:
       - sign-blob
-      - "--output-bundle=${signature}"
+      - "--bundle=${signature}"
       - "--yes"
       - "${artifact}"
     artifacts: archive

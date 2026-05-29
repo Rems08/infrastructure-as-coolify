@@ -84,14 +84,14 @@ docker run --rm ghcr.io/rems08/infrastructure-as-coolify version
 ```
 
 Images are multi-arch (`linux/amd64`, `linux/arm64`). Replace `:latest` with a version such
-as `:0.1.0-rc.1` to pin a release.
+as `:0.1.0-rc.2` to pin a release.
 
 ## Verifying release signatures
 
 Every release is signed with [cosign](https://docs.sigstore.dev/cosign/overview/) keyless
 (no long-lived key — the signature is bound to this repository's GitHub Actions identity) and
 ships [SLSA build level 3](https://slsa.dev/spec/v1.0/levels#build-l3) provenance. Set
-`TAG` to the release you downloaded, e.g. `TAG=v0.1.0-rc.1`.
+`TAG` to the release you downloaded, e.g. `TAG=v0.1.0-rc.2`.
 
 ```sh
 # Verify a downloaded archive against its cosign bundle

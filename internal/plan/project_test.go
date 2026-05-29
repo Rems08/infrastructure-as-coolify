@@ -7,6 +7,7 @@ import (
 	"github.com/Rems08/infrastructure-as-coolify/internal/coolify"
 	"github.com/Rems08/infrastructure-as-coolify/internal/plan"
 	"github.com/Rems08/infrastructure-as-coolify/internal/resource"
+	"github.com/Rems08/infrastructure-as-coolify/internal/secrets"
 )
 
 func TestProjectorsRoundTrip(t *testing.T) {
@@ -54,6 +55,88 @@ func TestFromApplicationNoImage(t *testing.T) {
 	desired := plan.FromApplication(app)
 	if len(desired.Fields) != 2 {
 		t.Errorf("no-image app should project 2 fields, got %d", len(desired.Fields))
+	}
+}
+
+func beenaireDB() resource.Database {
+	return resource.Database{
+		Metadata: resource.DatabaseMeta{Name: "pg-staging", Project: "beenaire", Environment: "staging"},
+		Spec: resource.DatabaseSpec{
+			Engine:      "postgresql",
+			Image:       "postgres:18-alpine",
+			Destination: resource.DestinationRef{Server: "localhost", Network: "coolify"},
+		},
+	}
+}
+
+func remoteBeenaireDB() coolify.Database {
+	// Coolify enriches a private database with an internal public_port and default limits;
+	// the projection must treat these as stable so a stable database shows no change.
+	var pw secrets.Secret
+	if err := pw.UnmarshalJSON([]byte(`"runtime-pg-password"`)); err != nil {
+		panic(err)
+	}
+	return coolify.Database{
+		Name:             "pg-staging",
+		Image:            "postgres:18-alpine",
+		IsPublic:         false,
+		PublicPort:       5432,
+		LimitsCPUShares:  1024,
+		LimitsMemory:     "0",
+		PostgresPassword: pw,
+		InternalDBURL:    pw,
+		Status:           "running:healthy",
+		CreatedAt:        "2026-01-01T00:00:00Z",
+	}
+}
+
+func TestPlanDatabase_zeroDiff_onIdenticalConfig(t *testing.T) {
+	desired := plan.FromDatabase(beenaireDB())
+	remote := plan.FromRemoteDatabase(remoteBeenaireDB())
+	if changes := plan.Diff(desired, &remote); len(changes) != 0 {
+		t.Errorf("stable database must not diff: %+v", changes)
+	}
+}
+
+func TestPlanDatabase_updateOnImageChange(t *testing.T) {
+	desired := plan.FromDatabase(beenaireDB())
+	remoteDB := remoteBeenaireDB()
+	remoteDB.Image = "postgres:17-alpine"
+	remote := plan.FromRemoteDatabase(remoteDB)
+	changes := plan.Diff(desired, &remote)
+	if len(changes) != 1 || changes[0].Op != plan.OpUpdate || changes[0].Path != "Database.pg-staging.image" {
+		t.Errorf("image drift diff = %+v", changes)
+	}
+}
+
+func TestPlanDatabase_updateOnMemoryLimitChange(t *testing.T) {
+	desiredDB := beenaireDB()
+	desiredDB.Spec.Limits = &resource.LimitsSpec{Memory: "512m"}
+	desired := plan.FromDatabase(desiredDB)
+	remoteDB := remoteBeenaireDB()
+	remoteDB.LimitsMemory = "256m"
+	remote := plan.FromRemoteDatabase(remoteDB)
+	changes := plan.Diff(desired, &remote)
+	if len(changes) != 1 || changes[0].Op != plan.OpUpdate || changes[0].Path != "Database.pg-staging.limits.memory" {
+		t.Errorf("memory limit drift diff = %+v", changes)
+	}
+}
+
+func TestPlanDatabase_excludesRuntimeAndSecretFields(t *testing.T) {
+	desired := plan.FromDatabase(beenaireDB())
+	remoteDB := remoteBeenaireDB()
+	// Runtime churn and a rotated credential must not register as drift.
+	remoteDB.Status = "restarting"
+	remoteDB.RestartCount = 7
+	remoteDB.UpdatedAt = "2026-05-29T12:00:00Z"
+	var rotated secrets.Secret
+	if err := rotated.UnmarshalJSON([]byte(`"a-different-password"`)); err != nil {
+		t.Fatal(err)
+	}
+	remoteDB.PostgresPassword = rotated
+	remote := plan.FromRemoteDatabase(remoteDB)
+	if changes := plan.Diff(desired, &remote); len(changes) != 0 {
+		t.Errorf("runtime/secret churn must not diff: %+v", changes)
 	}
 }
 

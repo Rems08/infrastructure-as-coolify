@@ -27,6 +27,8 @@ func (e exitErr) ExitCode() int { return e.code }
 
 type planOptions struct {
 	target       string
+	only         string
+	envFilter    []string
 	coolifyURL   string
 	output       string
 	detailedExit bool
@@ -51,6 +53,8 @@ func newPlanCmd() *cobra.Command {
 			return runPlan(cmd.Context(), cmd, opts)
 		},
 	}
+	cmd.Flags().StringVar(&opts.only, "target", "", "Plan only the resource with this logical name")
+	cmd.Flags().StringSliceVar(&opts.envFilter, "env", nil, "Filter to one or more environment names (repeat for multiple)")
 	cmd.Flags().StringVar(&opts.coolifyURL, "coolify-url", "", "Coolify base URL (or COOLIFY_API_URL); token via COOLIFY_API_TOKEN")
 	cmd.Flags().StringVar(&opts.output, "output", "", "Output format: text|json (default: auto-detect TTY/CI)")
 	cmd.Flags().BoolVar(&opts.detailedExit, "detailed-exitcode", false, "Exit 0 (no changes), 2 (changes), 1 (error)")
@@ -86,20 +90,12 @@ func runPlan(ctx context.Context, cmd *cobra.Command, opts planOptions) error {
 		return err
 	}
 
-	var p plan.Plan
-	for _, app := range apps {
-		actual, aErr := remoteApplication(ctx, client, rmap, app)
-		if aErr != nil {
-			return aErr
-		}
-		p.Add(plan.FromApplication(app), actual)
+	if vErr := validatePlanSelection(cmd, opts, apps, dbs); vErr != nil {
+		return vErr
 	}
-	for _, db := range dbs {
-		actual, aErr := remoteDatabase(ctx, client, rmap, db)
-		if aErr != nil {
-			return aErr
-		}
-		p.Add(plan.FromDatabase(db), actual)
+	p, err := buildPlan(ctx, client, rmap, opts, apps, dbs)
+	if err != nil {
+		return err
 	}
 
 	if err := writePlan(cmd, format, p); err != nil {
@@ -109,6 +105,47 @@ func runPlan(ctx context.Context, cmd *cobra.Command, opts planOptions) error {
 		return exitErr{code: 2}
 	}
 	return nil
+}
+
+// validatePlanSelection rejects a --env/--target combination that selects no application or
+// database before any diff is computed. Plan does not handle projects, environments or
+// services, so only the kinds it plans contribute to the environment universe.
+func validatePlanSelection(cmd *cobra.Command, opts planOptions, apps []resource.Application, dbs []resource.Database) error {
+	scope := newEnvScope(opts.only, opts.envFilter)
+	for _, app := range apps {
+		scope.add(app.Metadata.Name, app.Metadata.Environment)
+	}
+	for _, db := range dbs {
+		scope.add(db.Metadata.Name, db.Metadata.Environment)
+	}
+	return scope.validate(cmd, opts.target)
+}
+
+// buildPlan diffs each selected application and database against its live state. The --target
+// and --env filters are applied here so an unselected resource is never queried remotely.
+func buildPlan(ctx context.Context, client *coolify.Client, rmap state.Map, opts planOptions, apps []resource.Application, dbs []resource.Database) (plan.Plan, error) {
+	var p plan.Plan
+	for _, app := range apps {
+		if !selected(opts.only, app.Metadata.Name) || !matchesEnv(opts.envFilter, app.Metadata.Environment) {
+			continue
+		}
+		actual, err := remoteApplication(ctx, client, rmap, app)
+		if err != nil {
+			return p, err
+		}
+		p.Add(plan.FromApplication(app), actual)
+	}
+	for _, db := range dbs {
+		if !selected(opts.only, db.Metadata.Name) || !matchesEnv(opts.envFilter, db.Metadata.Environment) {
+			continue
+		}
+		actual, err := remoteDatabase(ctx, client, rmap, db)
+		if err != nil {
+			return p, err
+		}
+		p.Add(plan.FromDatabase(db), actual)
+	}
+	return p, nil
 }
 
 // resolveRemote verifies the pinned spec, resolves the live UUID map and optionally

@@ -37,6 +37,13 @@ type Operation struct {
 	ProjectSpec     *resource.Project
 	EnvironmentSpec *resource.Environment
 	ApplicationSpec *resource.Application
+	ServiceSpec     *resource.Service
+
+	// ServiceComposeRaw is the decoded docker-compose content for a compose_path Service,
+	// read and path-checked at load time. It is empty for a one-click (type) Service and
+	// for every non-Service operation. The engine base64-encodes it via the client and
+	// records only its hash in the audit log, never the content.
+	ServiceComposeRaw string
 
 	// Changes carries the field-level diff for an update (used to build the patch body
 	// and the audit diff hash). It is empty for create and delete.
@@ -73,6 +80,22 @@ func ApplicationOp(op Op, app resource.Application, changes []plan.Change) Opera
 	}
 }
 
+// ServiceOp builds an operation (create/update/delete) for a Service. composeRaw is the
+// decoded compose content for a compose_path service ("" for a one-click template or a
+// delete).
+func ServiceOp(op Op, svc resource.Service, composeRaw string, changes []plan.Change) Operation {
+	return Operation{
+		Op:                op,
+		Kind:              resource.KindService,
+		Project:           svc.Metadata.Project,
+		Environment:       svc.Metadata.Environment,
+		Name:              svc.Metadata.Name,
+		ServiceSpec:       &svc,
+		ServiceComposeRaw: composeRaw,
+		Changes:           changes,
+	}
+}
+
 // resourceLabel renders an operation's target as "Kind/project/environment/name",
 // skipping empty coordinates. Used in audit records and error messages.
 func resourceLabel(op Operation) string {
@@ -86,14 +109,18 @@ func resourceLabel(op Operation) string {
 }
 
 // secretSources returns the source declarations of every Secret an operation references
-// (e.g. "${env:DATABASE_URL}"), never their values. Only an Application carries secrets,
-// via its inline env vars.
+// (e.g. "${env:DATABASE_URL}"), never their values. Applications and Services carry
+// secrets via their inline env vars.
 func secretSources(op Operation) []string {
-	if op.ApplicationSpec == nil {
-		return nil
+	var entries []resource.EnvVarEntry
+	switch {
+	case op.ApplicationSpec != nil:
+		entries = op.ApplicationSpec.Spec.EnvVars
+	case op.ServiceSpec != nil:
+		entries = op.ServiceSpec.Spec.EnvVars
 	}
 	var out []string
-	for _, ev := range op.ApplicationSpec.Spec.EnvVars {
+	for _, ev := range entries {
 		if !ev.ValueSecret.IsZero() {
 			out = append(out, ev.ValueSecret.Origin())
 		}
@@ -111,6 +138,10 @@ func envKey(project, name string) state.ResourceKey {
 
 func appKey(project, environment, name string) state.ResourceKey {
 	return state.ResourceKey{Project: project, Environment: environment, Kind: resource.KindApplication, Name: name}
+}
+
+func serviceKey(project, environment, name string) state.ResourceKey {
+	return state.ResourceKey{Project: project, Environment: environment, Kind: resource.KindService, Name: name}
 }
 
 func serverKey(name string) state.ResourceKey {

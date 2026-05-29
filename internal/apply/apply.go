@@ -23,6 +23,10 @@ type Client interface {
 	CreateApplication(ctx context.Context, req coolify.CreateApplicationRequest) (string, error)
 	UpdateApplication(ctx context.Context, uuid string, req coolify.UpdateApplicationRequest) error
 	DeleteApplication(ctx context.Context, uuid string) error
+	CreateService(ctx context.Context, req coolify.CreateServiceRequest) (string, error)
+	UpdateService(ctx context.Context, uuid string, req coolify.UpdateServiceRequest) error
+	DeleteService(ctx context.Context, uuid string) error
+	BulkUpdateServiceEnvs(ctx context.Context, serviceUUID string, envs []coolify.ServiceEnvVar) error
 }
 
 // Summary counts the outcome of an apply run.
@@ -80,6 +84,8 @@ func (e *Engine) applyOne(ctx context.Context, op Operation) error {
 		return e.applyEnvironment(ctx, op)
 	case resource.KindApplication:
 		return e.applyApplication(ctx, op)
+	case resource.KindService:
+		return e.applyService(ctx, op)
 	default:
 		return fmt.Errorf("unsupported kind %q", op.Kind)
 	}
@@ -160,6 +166,90 @@ func (e *Engine) applyApplication(ctx context.Context, op Operation) error {
 	}
 }
 
+func (e *Engine) applyService(ctx context.Context, op Operation) error {
+	switch op.Op {
+	case OpCreate:
+		req, err := e.serviceCreateRequest(op)
+		if err != nil {
+			return err
+		}
+		uuid, err := e.client.CreateService(ctx, req)
+		if err != nil {
+			return err
+		}
+		e.resolved[serviceKey(op.Project, op.Environment, op.Name)] = uuid
+		return e.applyServiceEnvs(ctx, uuid, op)
+	case OpUpdate:
+		uuid, ok := e.resolved.Lookup(serviceKey(op.Project, op.Environment, op.Name))
+		if !ok {
+			return fmt.Errorf("service not resolved")
+		}
+		if err := e.client.UpdateService(ctx, uuid, coolify.UpdateServiceRequest{
+			Name:             op.Name,
+			Description:      op.ServiceSpec.Spec.Description,
+			DockerComposeRaw: op.ServiceComposeRaw,
+		}); err != nil {
+			return err
+		}
+		return e.applyServiceEnvs(ctx, uuid, op)
+	case OpDelete:
+		uuid, ok := e.resolved.Lookup(serviceKey(op.Project, op.Environment, op.Name))
+		if !ok {
+			return nil
+		}
+		return e.client.DeleteService(ctx, uuid)
+	default:
+		return fmt.Errorf("unsupported op %q for service", op.Op)
+	}
+}
+
+func (e *Engine) applyServiceEnvs(ctx context.Context, uuid string, op Operation) error {
+	envs := serviceEnvVars(op.ServiceSpec.Spec.EnvVars)
+	if len(envs) == 0 {
+		return nil
+	}
+	return e.client.BulkUpdateServiceEnvs(ctx, uuid, envs)
+}
+
+// serviceCreateRequest builds the create body from the desired spec and the resolved
+// parent UUIDs (project and destination server). EnvironmentUUID is left empty: v4
+// environments have no UUID and are addressed by name, so only environment_name is sent.
+func (e *Engine) serviceCreateRequest(op Operation) (coolify.CreateServiceRequest, error) {
+	svc := op.ServiceSpec
+	projUUID, ok := e.resolved.Lookup(projectKey(svc.Metadata.Project))
+	if !ok {
+		return coolify.CreateServiceRequest{}, fmt.Errorf("project %q not resolved", svc.Metadata.Project)
+	}
+	srvUUID, ok := e.resolved.Lookup(serverKey(svc.Spec.Destination.Server))
+	if !ok {
+		return coolify.CreateServiceRequest{}, fmt.Errorf("server %q not resolved", svc.Spec.Destination.Server)
+	}
+	return coolify.CreateServiceRequest{
+		Type:             svc.Spec.Type,
+		Name:             svc.Metadata.Name,
+		Description:      svc.Spec.Description,
+		ProjectUUID:      projUUID,
+		EnvironmentName:  svc.Metadata.Environment,
+		ServerUUID:       srvUUID,
+		InstantDeploy:    svc.Spec.InstantDeploy,
+		DockerComposeRaw: op.ServiceComposeRaw,
+	}, nil
+}
+
+// serviceEnvVars maps a service's declared env vars to client env vars, carrying each
+// Secret intact (revealed only later, at the HTTP boundary) so no value is exposed here.
+func serviceEnvVars(entries []resource.EnvVarEntry) []coolify.ServiceEnvVar {
+	out := make([]coolify.ServiceEnvVar, 0, len(entries))
+	for _, e := range entries {
+		ev := coolify.ServiceEnvVar{Key: e.Name, Value: e.Value}
+		if !e.ValueSecret.IsZero() {
+			ev.Secret = e.ValueSecret
+		}
+		out = append(out, ev)
+	}
+	return out
+}
+
 // applicationCreateRequest builds the create body from the desired spec and the resolved
 // parent UUIDs (project and destination server).
 func (e *Engine) applicationCreateRequest(op Operation) (coolify.CreateApplicationRequest, error) {
@@ -209,12 +299,23 @@ func updateRequestFromChanges(op Operation) coolify.UpdateApplicationRequest {
 
 func auditEntryFor(op Operation) AuditEntry {
 	return AuditEntry{
-		Operation: "apply",
-		Resource:  resourceLabel(op),
-		Op:        string(op.Op),
-		Sources:   secretSources(op),
-		DiffHash:  diffHash(op),
+		Operation:   "apply",
+		Resource:    resourceLabel(op),
+		Op:          string(op.Op),
+		Sources:     secretSources(op),
+		DiffHash:    diffHash(op),
+		ComposeHash: composeHash(op),
 	}
+}
+
+// composeHash returns sha256 of a Service's decoded compose content, or "" when there is
+// none. The content never reaches the audit log; only this hash does.
+func composeHash(op Operation) string {
+	if op.ServiceComposeRaw == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(op.ServiceComposeRaw))
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 // diffHash is a sha256 over the operation's redaction-safe diff (paths and display-safe

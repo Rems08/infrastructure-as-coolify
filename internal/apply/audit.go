@@ -17,6 +17,10 @@ type AuditEntry struct {
 	Op        string   `json:"op"`        // create | update | delete
 	Sources   []string `json:"sources,omitempty"`
 	DiffHash  string   `json:"diff_hash,omitempty"`
+	// ComposeHash is sha256 of a Service's decoded docker-compose content. The content
+	// itself is never logged: a compose file can hold inline secrets, and the audit log is
+	// a plain local file an operator might commit by accident.
+	ComposeHash string `json:"compose_hash,omitempty"`
 }
 
 // Auditor appends audit entries to a local, append-only log file created 0600 (the run is

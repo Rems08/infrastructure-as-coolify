@@ -16,7 +16,7 @@ func kindRank(kind string) int {
 		return 0
 	case resource.KindEnvironment:
 		return 1
-	default: // Application (and future Database/Service)
+	default: // Application, Service (and future Database)
 		return 2
 	}
 }
@@ -33,7 +33,7 @@ func dependsOn(op Operation) []string {
 	switch op.Kind {
 	case resource.KindEnvironment:
 		return []string{nodeID(resource.KindProject, "", "", op.Project)}
-	case resource.KindApplication:
+	case resource.KindApplication, resource.KindService:
 		return []string{
 			nodeID(resource.KindProject, "", "", op.Project),
 			nodeID(resource.KindEnvironment, op.Project, "", op.Environment),

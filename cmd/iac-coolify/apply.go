@@ -23,6 +23,7 @@ type applyOptions struct {
 	target      string
 	configDir   string
 	only        string
+	envFilter   []string
 	coolifyURL  string
 	output      string
 	autoApprove bool
@@ -53,6 +54,7 @@ func newApplyCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.configDir, "config-dir", "coolify", "Root config directory (used when PATH is omitted)")
 	cmd.Flags().StringVar(&opts.only, "target", "", "Apply only the resource with this logical name")
+	cmd.Flags().StringSliceVar(&opts.envFilter, "env", nil, "Filter to one or more environment names (repeat for multiple)")
 	cmd.Flags().StringVar(&opts.coolifyURL, "coolify-url", "", "Coolify base URL (or COOLIFY_API_URL); token via COOLIFY_API_TOKEN")
 	cmd.Flags().StringVar(&opts.output, "output", "", "Output format: text|json (default: auto-detect TTY/CI)")
 	cmd.Flags().BoolVar(&opts.autoApprove, "auto-approve", false, "Apply without an interactive prompt (required in CI)")
@@ -80,7 +82,7 @@ func runApply(ctx context.Context, cmd *cobra.Command, opts applyOptions) error 
 	if err != nil {
 		return err
 	}
-	ops, err := buildOperations(ctx, client, resolved, opts)
+	ops, err := buildOperations(ctx, cmd, client, resolved, opts)
 	if err != nil {
 		return err
 	}
@@ -136,7 +138,7 @@ func applyResolve(ctx context.Context, opts applyOptions, log *slog.Logger) (sta
 // buildOperations turns the desired resources into the create/update operations needed to
 // converge. Already-present projects and environments are skipped; applications are
 // diffed against their live state.
-func buildOperations(ctx context.Context, client *coolify.Client, resolved state.Map, opts applyOptions) ([]apply.Operation, error) {
+func buildOperations(ctx context.Context, cmd *cobra.Command, client *coolify.Client, resolved state.Map, opts applyOptions) ([]apply.Operation, error) {
 	projects, err := config.LoadProjects(opts.target)
 	if err != nil {
 		return nil, err
@@ -154,6 +156,13 @@ func buildOperations(ctx context.Context, client *coolify.Client, resolved state
 		return nil, err
 	}
 
+	if vErr := validateSelection(cmd, opts.only, opts.envFilter, opts.target, projects, envs, apps, services); vErr != nil {
+		return nil, vErr
+	}
+	envs = filterByEnv(envs, opts.envFilter, func(e resource.Environment) string { return e.Metadata.Name })
+	apps = filterByEnv(apps, opts.envFilter, func(a resource.Application) string { return a.Metadata.Environment })
+	services = filterByEnv(services, opts.envFilter, func(ls config.LoadedService) string { return ls.Service.Metadata.Environment })
+
 	ops := projectEnvOps(projects, envs, resolved, opts.only)
 	appOps, err := applicationOps(ctx, client, resolved, apps, opts.only)
 	if err != nil {
@@ -161,6 +170,26 @@ func buildOperations(ctx context.Context, client *coolify.Client, resolved state
 	}
 	ops = append(ops, appOps...)
 	return append(ops, serviceOps(services, resolved, opts.only)...), nil
+}
+
+// validateSelection rejects a --env/--target combination that matches no declared resource
+// before any Coolify call is made. Projects are cross-environment, so they count toward a name
+// selection but never restrict the environment universe.
+func validateSelection(cmd *cobra.Command, only string, envFilter []string, path string, projects []resource.Project, envs []resource.Environment, apps []resource.Application, services []config.LoadedService) error {
+	scope := newEnvScope(only, envFilter)
+	for _, p := range projects {
+		scope.addCrossEnv(p.Metadata.Name)
+	}
+	for _, e := range envs {
+		scope.add(e.Metadata.Name, e.Metadata.Name)
+	}
+	for _, a := range apps {
+		scope.add(a.Metadata.Name, a.Metadata.Environment)
+	}
+	for _, ls := range services {
+		scope.add(ls.Service.Metadata.Name, ls.Service.Metadata.Environment)
+	}
+	return scope.validate(cmd, path)
 }
 
 // projectEnvOps returns the create operations for projects and environments not yet

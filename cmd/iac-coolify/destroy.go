@@ -19,6 +19,7 @@ type destroyOptions struct {
 	target      string
 	configDir   string
 	only        string
+	envFilter   []string
 	coolifyURL  string
 	output      string
 	autoApprove bool
@@ -49,6 +50,7 @@ func newDestroyCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.configDir, "config-dir", "coolify", "Root config directory (used when PATH is omitted)")
 	cmd.Flags().StringVar(&opts.only, "target", "", "Destroy only the resource with this logical name")
+	cmd.Flags().StringSliceVar(&opts.envFilter, "env", nil, "Filter to one or more environment names (repeat for multiple)")
 	cmd.Flags().StringVar(&opts.coolifyURL, "coolify-url", "", "Coolify base URL (or COOLIFY_API_URL); token via COOLIFY_API_TOKEN")
 	cmd.Flags().StringVar(&opts.output, "output", "", "Output format: text|json (default: auto-detect TTY/CI)")
 	cmd.Flags().BoolVar(&opts.autoApprove, "auto-approve", false, "Destroy without an interactive prompt (required in CI)")
@@ -73,7 +75,7 @@ func runDestroy(ctx context.Context, cmd *cobra.Command, opts destroyOptions) er
 		return err
 	}
 
-	in, err := loadDeleteInput(opts.target, resolved, opts.only, !online && opts.dryRun)
+	in, err := loadDeleteInput(cmd, opts, resolved, !online && opts.dryRun)
 	if err != nil {
 		return err
 	}
@@ -127,26 +129,34 @@ func destroyResolve(ctx context.Context, opts destroyOptions, log *slog.Logger) 
 	return resolved, client, online, nil
 }
 
-// loadDeleteInput loads every declared resource under target and pairs it with the live
-// state. assumePresent is set for an offline dry-run, where the live state is unknown and
-// every declared resource is listed as to-destroy.
-func loadDeleteInput(target string, resolved state.Map, only string, assumePresent bool) (apply.DeleteInput, error) {
-	projects, err := config.LoadProjects(target)
+// loadDeleteInput loads every declared resource under the target path and pairs it with the
+// live state. assumePresent is set for an offline dry-run, where the live state is unknown and
+// every declared resource is listed as to-destroy. Resources outside the requested
+// environments are dropped before the delete plan is built; projects are cross-environment and
+// are never dropped by --env.
+func loadDeleteInput(cmd *cobra.Command, opts destroyOptions, resolved state.Map, assumePresent bool) (apply.DeleteInput, error) {
+	projects, err := config.LoadProjects(opts.target)
 	if err != nil {
 		return apply.DeleteInput{}, err
 	}
-	envs, err := config.LoadEnvironments(target)
+	envs, err := config.LoadEnvironments(opts.target)
 	if err != nil {
 		return apply.DeleteInput{}, err
 	}
-	apps, err := config.LoadApplications(target)
+	apps, err := config.LoadApplications(opts.target)
 	if err != nil {
 		return apply.DeleteInput{}, err
 	}
-	loaded, err := config.LoadServices(target)
+	loaded, err := config.LoadServices(opts.target)
 	if err != nil {
 		return apply.DeleteInput{}, err
 	}
+	if err := validateSelection(cmd, opts.only, opts.envFilter, opts.target, projects, envs, apps, loaded); err != nil {
+		return apply.DeleteInput{}, err
+	}
+	envs = filterByEnv(envs, opts.envFilter, func(e resource.Environment) string { return e.Metadata.Name })
+	apps = filterByEnv(apps, opts.envFilter, func(a resource.Application) string { return a.Metadata.Environment })
+	loaded = filterByEnv(loaded, opts.envFilter, func(ls config.LoadedService) string { return ls.Service.Metadata.Environment })
 	services := make([]resource.Service, 0, len(loaded))
 	for _, ls := range loaded {
 		services = append(services, ls.Service)
@@ -157,7 +167,7 @@ func loadDeleteInput(target string, resolved state.Map, only string, assumePrese
 		Applications:  apps,
 		Services:      services,
 		Resolved:      resolved,
-		Only:          only,
+		Only:          opts.only,
 		AssumePresent: assumePresent,
 	}, nil
 }

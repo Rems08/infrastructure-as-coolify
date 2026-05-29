@@ -8,6 +8,7 @@ package secrets
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -26,6 +27,10 @@ const (
 	SourceEnv
 	// SourceSOPS marks a Secret sourced from ${sops:path}.
 	SourceSOPS
+	// SourceRemote marks a Secret decoded from a live API response. Its value is a
+	// runtime literal with no source declaration; it carries no Origin and exists only
+	// so a credential read back from the API stays opaque (redacted by every interface).
+	SourceRemote
 )
 
 // Secret holds a value that MUST NEVER appear in logs, plan output, state cache,
@@ -56,6 +61,16 @@ func NewFromEnv(envName string) (Secret, error) {
 // NewFromSOPS builds a Secret from a SOPS-decrypted value.
 func NewFromSOPS(decrypted, path string) Secret {
 	return Secret{value: decrypted, source: SourceSOPS, origin: "${sops:" + path + "}"}
+}
+
+// NewRemote builds an opaque Secret from a runtime value read back from the API. It has
+// no source declaration (Origin is empty), so it renders as [REDACTED] everywhere. An
+// empty value yields the unset zero Secret, so a null/absent API field stays IsZero.
+func NewRemote(value string) Secret {
+	if value == "" {
+		return Secret{}
+	}
+	return Secret{value: value, source: SourceRemote}
 }
 
 // Reveal returns the raw value. The caller MUST use it immediately at a security
@@ -91,6 +106,23 @@ func (s Secret) GoString() string { return "secrets.Secret{[REDACTED]}" }
 
 // MarshalJSON implements json.Marshaler.
 func (s Secret) MarshalJSON() ([]byte, error) { return []byte(`"[REDACTED]"`), nil }
+
+// UnmarshalJSON decodes a credential read back from a live API response into an opaque
+// remote Secret. Unlike UnmarshalYAML (user input, where a literal is forbidden so secrets
+// can never be hardcoded in a manifest), the API legitimately returns the runtime value as
+// a JSON literal; it is wrapped immediately so it stays redacted. A JSON null or empty
+// string yields the unset zero Secret.
+func (s *Secret) UnmarshalJSON(b []byte) error {
+	if string(b) == "null" {
+		return nil
+	}
+	var raw string
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	*s = NewRemote(raw)
+	return nil
+}
 
 // MarshalYAML implements the goccy/go-yaml InterfaceMarshaler: it serialises the
 // origin declaration only, never the value.

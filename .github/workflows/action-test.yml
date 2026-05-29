@@ -1,0 +1,24 @@
+# Builds the local Docker action and runs it against a checked-in example. validate
+# on examples/minimal is fully offline and needs no Coolify token, so the job is
+# deterministic; examples/ as a whole is unsuitable because it includes a fixture
+# that is meant to fail validation.
+name: action-test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  self-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate an example through the action
+        uses: ./
+        with:
+          command: validate
+          path: examples/minimal

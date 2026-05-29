@@ -1,0 +1,43 @@
+name: iac-coolify
+description: Run iac-coolify (plan/apply/destroy/validate) against a Coolify instance.
+author: Rems08
+branding:
+  icon: upload-cloud
+  color: blue
+
+inputs:
+  command:
+    description: "iac-coolify subcommand to run: plan, apply, destroy or validate."
+    required: true
+    default: plan
+  path:
+    description: "Path to the configuration directory."
+    required: false
+    default: "."
+  target:
+    description: "Restrict the run to a single resource by its logical metadata name."
+    required: false
+    default: ""
+  env:
+    description: "Environments to act on. Accepts several, separated by spaces, commas or newlines."
+    required: false
+    default: ""
+  auto-approve:
+    description: "Pass --auto-approve to apply/destroy (required in non-interactive CI). Ignored by plan/validate."
+    required: false
+    default: "true"
+  api-token:
+    description: "Coolify API token, exported as COOLIFY_API_TOKEN. Pass it from a masked secret."
+    required: false
+    default: ""
+
+runs:
+  using: docker
+  image: .github/action/Dockerfile
+  args:
+    - ${{ inputs.command }}
+    - ${{ inputs.path }}
+    - ${{ inputs.target }}
+    - ${{ inputs.env }}
+    - ${{ inputs.auto-approve }}
+    - ${{ inputs.api-token }}

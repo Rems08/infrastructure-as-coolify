@@ -1,8 +1,10 @@
 package state_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -85,6 +87,8 @@ func TestResolveUUIDsFromHTTPTest(t *testing.T) {
 			{"uuid":"uuid-obs-stg","name":"observability","environment_id":10},
 			{"uuid":"uuid-svc-orphan","name":"orphan-svc","environment_id":999}
 		]`,
+		"/api/v1/servers/srv-1/resources": `[]`,
+		"/api/v1/servers/srv-2/resources": `[]`,
 	}
 	srv := serve(t, bodies, nil)
 	m, err := state.Resolve(context.Background(), newClient(t, srv.URL))
@@ -200,6 +204,177 @@ func TestResolveServicesError(t *testing.T) {
 	if _, err := state.Resolve(context.Background(), newClient(t, srv.URL)); err == nil {
 		t.Fatal("want error when /services fails")
 	}
+}
+
+func dbKey(name string) state.ResourceKey {
+	return state.ResourceKey{Kind: resource.KindDatabase, Name: name}
+}
+
+func serversResourcesFixture(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", "servers-resources.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+// oneServerBodies returns a minimal Resolve body set with a single server whose
+// /resources endpoint serves resourcesBody.
+func oneServerBodies(resourcesBody string) map[string]string {
+	return map[string]string{
+		"/api/v1/projects":                  `[]`,
+		"/api/v1/servers":                   `[{"uuid":"srv-bee","name":"localhost"}]`,
+		"/api/v1/applications":              `[]`,
+		"/api/v1/services":                  `[]`,
+		"/api/v1/servers/srv-bee/resources": resourcesBody,
+	}
+}
+
+func TestResolveDatabases_filtersStandalonePrefix(t *testing.T) {
+	srv := serve(t, oneServerBodies(serversResourcesFixture(t)), nil)
+	m, err := state.Resolve(context.Background(), newClient(t, srv.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"pg-restaurant-core-api":                     "dpzndbf9fgt7uqyoucwt8986",
+		"pg-restaurant-core-api-staging":             "t50fefd4yb1salodq9bipiw3",
+		"redis-database-restaurant-core-api":         "oqsk32s77rp7svh6r8cgmkw9",
+		"redis-database-restaurant-core-api-staging": "dj50mi6c35is4cjh7x52ww43",
+	}
+	var dbCount int
+	for k := range m {
+		if k.Kind == resource.KindDatabase {
+			dbCount++
+		}
+	}
+	if dbCount != len(want) {
+		t.Fatalf("resolved %d databases, want %d: %+v", dbCount, len(want), m)
+	}
+	for name, uuid := range want {
+		got, ok := m.Lookup(dbKey(name))
+		if !ok || got != uuid {
+			t.Errorf("Lookup(db %q) = %q,%v want %q", name, got, ok, uuid)
+		}
+	}
+}
+
+func TestResolveDatabases_skipsApplicationAndService(t *testing.T) {
+	srv := serve(t, oneServerBodies(serversResourcesFixture(t)), nil)
+	m, err := state.Resolve(context.Background(), newClient(t, srv.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"Beenaire DOC", "restaurant-core-api-staging", "kafka-restaurant-core-api", "restaurant-core-api-workers"} {
+		if _, ok := m.Lookup(dbKey(name)); ok {
+			t.Errorf("non-standalone resource %q must not be keyed as a Database", name)
+		}
+	}
+}
+
+func TestResolveDatabases_multipleServers(t *testing.T) {
+	bodies := map[string]string{
+		"/api/v1/projects":     `[]`,
+		"/api/v1/servers":      `[{"uuid":"srv-a","name":"a"},{"uuid":"srv-b","name":"b"}]`,
+		"/api/v1/applications": `[]`,
+		"/api/v1/services":     `[]`,
+		"/api/v1/servers/srv-a/resources": `[
+			{"id":1,"uuid":"u-pg","name":"pg-main","type":"standalone-postgresql","status":"running:healthy"},
+			{"id":2,"uuid":"u-app","name":"web","type":"application","status":"running:healthy"}
+		]`,
+		"/api/v1/servers/srv-b/resources": `[
+			{"id":3,"uuid":"u-redis","name":"redis-main","type":"standalone-redis","status":"running:healthy"}
+		]`,
+	}
+	srv := serve(t, bodies, nil)
+	m, err := state.Resolve(context.Background(), newClient(t, srv.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := m.Lookup(dbKey("pg-main")); !ok || got != "u-pg" {
+		t.Errorf("pg-main = %q,%v want u-pg", got, ok)
+	}
+	if got, ok := m.Lookup(dbKey("redis-main")); !ok || got != "u-redis" {
+		t.Errorf("redis-main = %q,%v want u-redis", got, ok)
+	}
+}
+
+func TestResolveDatabases_emptyServerList(t *testing.T) {
+	bodies := map[string]string{
+		"/api/v1/projects":     `[]`,
+		"/api/v1/servers":      `[]`,
+		"/api/v1/applications": `[]`,
+		"/api/v1/services":     `[]`,
+	}
+	srv := serve(t, bodies, nil)
+	m, err := state.Resolve(context.Background(), newClient(t, srv.URL))
+	if err != nil {
+		t.Fatalf("empty server list must be a no-op, got error: %v", err)
+	}
+	for k := range m {
+		if k.Kind == resource.KindDatabase {
+			t.Errorf("no databases expected with zero servers, got %v", k)
+		}
+	}
+}
+
+func TestResolveDatabases_propagatesResourcesError(t *testing.T) {
+	bodies := oneServerBodies("")
+	delete(bodies, "/api/v1/servers/srv-bee/resources")
+	srv := serve(t, bodies, map[string]int{"/api/v1/servers/srv-bee/resources": http.StatusInternalServerError})
+	_, err := state.Resolve(context.Background(), newClient(t, srv.URL))
+	if err == nil {
+		t.Fatal("want error when /servers/{uuid}/resources fails")
+	}
+	if !strings.Contains(err.Error(), "srv-bee") {
+		t.Errorf("error %q must name the failing server for debugging", err)
+	}
+}
+
+func TestResolveDatabases_logsCounters(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	srv := serve(t, oneServerBodies(serversResourcesFixture(t)), nil)
+	if _, err := state.Resolve(context.Background(), newClient(t, srv.URL)); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := findLogRecord(t, buf.Bytes(), "resolved databases")
+	wantAttrs := map[string]float64{
+		"resolver.databases.servers_scanned":     1,
+		"resolver.databases.resources_total":     9,
+		"resolver.databases.standalone_filtered": 4,
+		"resolver.databases.resolved":            4,
+	}
+	for key, want := range wantAttrs {
+		got, ok := rec[key].(float64)
+		if !ok || got != want {
+			t.Errorf("attr %q = %v (ok=%v), want %v", key, rec[key], ok, want)
+		}
+	}
+}
+
+// findLogRecord returns the first JSON slog record whose msg matches.
+func findLogRecord(t *testing.T, out []byte, msg string) map[string]any {
+	t.Helper()
+	for _, line := range bytes.Split(bytes.TrimSpace(out), []byte("\n")) {
+		if len(line) == 0 {
+			continue
+		}
+		var rec map[string]any
+		if err := json.Unmarshal(line, &rec); err != nil {
+			t.Fatalf("log line is not JSON: %s", line)
+		}
+		if rec["msg"] == msg {
+			return rec
+		}
+	}
+	t.Fatalf("no log record with msg %q in:\n%s", msg, out)
+	return nil
 }
 
 func TestMapSaveRoundTrip(t *testing.T) {

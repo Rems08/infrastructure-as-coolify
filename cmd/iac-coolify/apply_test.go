@@ -110,6 +110,8 @@ func applyMux(t *testing.T, failPath string) (*httptest.Server, *[]string) {
 			_, _ = w.Write([]byte(`[]`))
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/services":
 			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/resources"):
+			_, _ = w.Write([]byte(`[]`))
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/projects":
 			_, _ = w.Write([]byte(`{"uuid":"proj-uuid"}`))
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/environments"):

@@ -1,3 +1,14 @@
+// Package config is the boundary between user-authored YAML and the typed resource model.
+// It loads a config tree (one file per resource, walked recursively), decodes each manifest
+// strictly so unknown or duplicate fields are rejected, resolves ${env:VAR} and ${sops:path}
+// interpolation, and validates every field with line/column positions before any business
+// code runs — apply and plan trust the structs they receive.
+//
+// The public entry points load one kind each from a target path:
+// LoadProjects, LoadEnvironments, LoadApplications, LoadServices, LoadDatabases, and
+// LoadEnvVar, plus their single-file LoadX variants. Validate runs the full check suite
+// (with an optional --strict pass), ResolveEnvInterpolation expands a single reference, and
+// DetectSecretLike flags a secret-looking value placed in a visible field.
 package config
 
 import (

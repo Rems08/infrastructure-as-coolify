@@ -232,3 +232,126 @@ type ServiceEnvVar struct {
 	Value  string         `json:"value"`
 	Secret secrets.Secret `json:"-"`
 }
+
+// CreateDatabaseCommon holds the fields every POST /databases/{engine} endpoint accepts.
+// Each engine's request embeds it and adds the engine-specific fields. server_uuid and
+// project_uuid are required by every endpoint; at least one of environment_name or
+// environment_uuid must be set (v4 environments have no UUID, so only the name is sent).
+type CreateDatabaseCommon struct {
+	ServerUUID      string `json:"server_uuid"`
+	ProjectUUID     string `json:"project_uuid"`
+	EnvironmentName string `json:"environment_name,omitempty"`
+	EnvironmentUUID string `json:"environment_uuid,omitempty"`
+	DestinationUUID string `json:"destination_uuid,omitempty"`
+	Name            string `json:"name,omitempty"`
+	Description     string `json:"description,omitempty"`
+	Image           string `json:"image,omitempty"`
+	IsPublic        bool   `json:"is_public,omitempty"`
+	PublicPort      int    `json:"public_port,omitempty"`
+	LimitsCPUShares int    `json:"limits_cpu_shares,omitempty"`
+	LimitsMemory    string `json:"limits_memory,omitempty"`
+	InstantDeploy   bool   `json:"instant_deploy,omitempty"`
+}
+
+// CreateDatabasePostgresqlRequest is the body for POST /databases/postgresql. The password
+// is a Secret with json:"-"; it is revealed into the wire body only inside this package
+// (see credentials), never serialised by the redacting Secret marshaller.
+type CreateDatabasePostgresqlRequest struct {
+	CreateDatabaseCommon
+	PostgresUser           string         `json:"postgres_user,omitempty"`
+	PostgresDB             string         `json:"postgres_db,omitempty"`
+	PostgresInitDBArgs     string         `json:"postgres_initdb_args,omitempty"`
+	PostgresHostAuthMethod string         `json:"postgres_host_auth_method,omitempty"`
+	PostgresConf           string         `json:"postgres_conf,omitempty"`
+	PostgresPassword       secrets.Secret `json:"-"`
+}
+
+// CreateDatabaseMysqlRequest is the body for POST /databases/mysql.
+type CreateDatabaseMysqlRequest struct {
+	CreateDatabaseCommon
+	MySQLUser         string         `json:"mysql_user,omitempty"`
+	MySQLDatabase     string         `json:"mysql_database,omitempty"`
+	MySQLConf         string         `json:"mysql_conf,omitempty"`
+	MySQLRootPassword secrets.Secret `json:"-"`
+	MySQLPassword     secrets.Secret `json:"-"`
+}
+
+// CreateDatabaseMariadbRequest is the body for POST /databases/mariadb.
+type CreateDatabaseMariadbRequest struct {
+	CreateDatabaseCommon
+	MariaDBUser         string         `json:"mariadb_user,omitempty"`
+	MariaDBDatabase     string         `json:"mariadb_database,omitempty"`
+	MariaDBConf         string         `json:"mariadb_conf,omitempty"`
+	MariaDBRootPassword secrets.Secret `json:"-"`
+	MariaDBPassword     secrets.Secret `json:"-"`
+}
+
+// CreateDatabaseMongodbRequest is the body for POST /databases/mongodb. The pinned v4 spec
+// exposes no password field on create (only mongo_initdb_root_username); a password is set
+// later via PATCH (see UpdateDatabaseRequest).
+type CreateDatabaseMongodbRequest struct {
+	CreateDatabaseCommon
+	MongoConf               string `json:"mongo_conf,omitempty"`
+	MongoInitDBRootUsername string `json:"mongo_initdb_root_username,omitempty"`
+}
+
+// CreateDatabaseRedisRequest is the body for POST /databases/redis.
+type CreateDatabaseRedisRequest struct {
+	CreateDatabaseCommon
+	RedisConf     string         `json:"redis_conf,omitempty"`
+	RedisPassword secrets.Secret `json:"-"`
+}
+
+// CreateDatabaseKeydbRequest is the body for POST /databases/keydb.
+type CreateDatabaseKeydbRequest struct {
+	CreateDatabaseCommon
+	KeyDBConf     string         `json:"keydb_conf,omitempty"`
+	KeyDBPassword secrets.Secret `json:"-"`
+}
+
+// CreateDatabaseDragonflyRequest is the body for POST /databases/dragonfly.
+type CreateDatabaseDragonflyRequest struct {
+	CreateDatabaseCommon
+	DragonflyPassword secrets.Secret `json:"-"`
+}
+
+// CreateDatabaseClickhouseRequest is the body for POST /databases/clickhouse.
+type CreateDatabaseClickhouseRequest struct {
+	CreateDatabaseCommon
+	ClickhouseAdminUser     string         `json:"clickhouse_admin_user,omitempty"`
+	ClickhouseAdminPassword secrets.Secret `json:"-"`
+}
+
+// UpdateDatabaseRequest is the partial body sent to PATCH /databases/{uuid}. Only the
+// non-empty fields are sent. IsPublic is a pointer so toggling a database back to private
+// (false) is distinguishable from "field unchanged". Credential rotation is intentionally
+// absent: a secret never field-diffs, so a password change is an explicit future operation.
+type UpdateDatabaseRequest struct {
+	Name            string `json:"name,omitempty"`
+	Description     string `json:"description,omitempty"`
+	Image           string `json:"image,omitempty"`
+	IsPublic        *bool  `json:"is_public,omitempty"`
+	PublicPort      int    `json:"public_port,omitempty"`
+	LimitsCPUShares int    `json:"limits_cpu_shares,omitempty"`
+	LimitsMemory    string `json:"limits_memory,omitempty"`
+}
+
+// DeleteDatabaseOptions are the DELETE /databases/{uuid} query flags. The Coolify v4
+// default for each is true; DefaultDeleteDatabaseOptions mirrors that.
+type DeleteDatabaseOptions struct {
+	DeleteConfigurations    bool
+	DeleteVolumes           bool
+	DockerCleanup           bool
+	DeleteConnectedNetworks bool
+}
+
+// DefaultDeleteDatabaseOptions returns the options matching the API defaults (all true): a
+// full teardown of configurations, volumes, connected networks and a docker cleanup.
+func DefaultDeleteDatabaseOptions() DeleteDatabaseOptions {
+	return DeleteDatabaseOptions{
+		DeleteConfigurations:    true,
+		DeleteVolumes:           true,
+		DockerCleanup:           true,
+		DeleteConnectedNetworks: true,
+	}
+}

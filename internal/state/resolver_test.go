@@ -80,6 +80,11 @@ func TestResolveUUIDsFromHTTPTest(t *testing.T) {
 			{"uuid":"uuid-lab-x","name":"x","environment_id":20},
 			{"uuid":"uuid-orphan","name":"orphan","environment_id":999}
 		]`,
+		"/api/v1/services": `[
+			{"uuid":"uuid-obs-prod","name":"observability","environment_id":11},
+			{"uuid":"uuid-obs-stg","name":"observability","environment_id":10},
+			{"uuid":"uuid-svc-orphan","name":"orphan-svc","environment_id":999}
+		]`,
 	}
 	srv := serve(t, bodies, nil)
 	m, err := state.Resolve(context.Background(), newClient(t, srv.URL))
@@ -95,6 +100,9 @@ func TestResolveUUIDsFromHTTPTest(t *testing.T) {
 	}
 	sKey := func(name string) state.ResourceKey {
 		return state.ResourceKey{Kind: state.KindServer, Name: name}
+	}
+	svcKey := func(project, env, name string) state.ResourceKey {
+		return state.ResourceKey{Project: project, Environment: env, Kind: resource.KindService, Name: name}
 	}
 	want := map[state.ResourceKey]string{
 		// Applications: keyed (project, env, name) → uuid.
@@ -112,6 +120,9 @@ func TestResolveUUIDsFromHTTPTest(t *testing.T) {
 		// Servers → uuid.
 		sKey("localhost"): "srv-1",
 		sKey("edge"):      "srv-2",
+		// Services: keyed (project, env, name) → uuid; same name across envs.
+		svcKey("beenaire", "production", "observability"): "uuid-obs-prod",
+		svcKey("beenaire", "staging", "observability"):    "uuid-obs-stg",
 	}
 	if len(m) != len(want) {
 		t.Fatalf("map size = %d, want %d (orphan must be skipped): %+v", len(m), len(want), m)
@@ -138,6 +149,7 @@ func TestResolveEmpty(t *testing.T) {
 		"/api/v1/projects":     `[]`,
 		"/api/v1/servers":      `[]`,
 		"/api/v1/applications": `[]`,
+		"/api/v1/services":     `[]`,
 	}
 	srv := serve(t, bodies, nil)
 	m, err := state.Resolve(context.Background(), newClient(t, srv.URL))
@@ -174,6 +186,19 @@ func TestResolveServersError(t *testing.T) {
 	srv := serve(t, bodies, map[string]int{"/api/v1/servers": http.StatusInternalServerError})
 	if _, err := state.Resolve(context.Background(), newClient(t, srv.URL)); err == nil {
 		t.Fatal("want error when /servers fails")
+	}
+}
+
+func TestResolveServicesError(t *testing.T) {
+	bodies := map[string]string{
+		"/api/v1/projects":                       `[{"id":1,"uuid":"proj-bee","name":"beenaire"}]`,
+		"/api/v1/projects/proj-bee/environments": `[]`,
+		"/api/v1/servers":                        `[]`,
+		"/api/v1/applications":                   `[]`,
+	}
+	srv := serve(t, bodies, map[string]int{"/api/v1/services": http.StatusBadRequest})
+	if _, err := state.Resolve(context.Background(), newClient(t, srv.URL)); err == nil {
+		t.Fatal("want error when /services fails")
 	}
 }
 

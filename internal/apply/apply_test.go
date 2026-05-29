@@ -20,6 +20,8 @@ type recordedCall struct {
 	envProjUUID string
 	appReq      coolify.CreateApplicationRequest
 	updReq      coolify.UpdateApplicationRequest
+	svcReq      coolify.CreateServiceRequest
+	envs        []coolify.ServiceEnvVar
 	uuid        string
 }
 
@@ -68,6 +70,26 @@ func (m *mockClient) UpdateApplication(_ context.Context, uuid string, req cooli
 func (m *mockClient) DeleteApplication(_ context.Context, uuid string) error {
 	m.calls = append(m.calls, recordedCall{method: "DeleteApplication", uuid: uuid})
 	return m.fail("DeleteApplication")
+}
+
+func (m *mockClient) CreateService(_ context.Context, req coolify.CreateServiceRequest) (string, error) {
+	m.calls = append(m.calls, recordedCall{method: "CreateService", svcReq: req})
+	return "svc-uuid", m.fail("CreateService")
+}
+
+func (m *mockClient) UpdateService(_ context.Context, uuid string, _ coolify.UpdateServiceRequest) error {
+	m.calls = append(m.calls, recordedCall{method: "UpdateService", uuid: uuid})
+	return m.fail("UpdateService")
+}
+
+func (m *mockClient) DeleteService(_ context.Context, uuid string) error {
+	m.calls = append(m.calls, recordedCall{method: "DeleteService", uuid: uuid})
+	return m.fail("DeleteService")
+}
+
+func (m *mockClient) BulkUpdateServiceEnvs(_ context.Context, serviceUUID string, envs []coolify.ServiceEnvVar) error {
+	m.calls = append(m.calls, recordedCall{method: "BulkUpdateServiceEnvs", uuid: serviceUUID, envs: envs})
+	return m.fail("BulkUpdateServiceEnvs")
 }
 
 func dockerimageApp() resource.Application {

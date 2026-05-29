@@ -45,6 +45,9 @@ func ProjectSchema() *jsonschema.Schema { return newReflector().Reflect(&Project
 // EnvironmentSchema returns the JSON Schema for an Environment resource.
 func EnvironmentSchema() *jsonschema.Schema { return newReflector().Reflect(&Environment{}) }
 
+// ServiceSchema returns the JSON Schema for a Service resource.
+func ServiceSchema() *jsonschema.Schema { return newReflector().Reflect(&Service{}) }
+
 // Schemas maps each resource slug (matching its source file and generated docs) to its
 // JSON Schema, so docs generation can emit one schema per resource.
 func Schemas() map[string]*jsonschema.Schema {
@@ -54,5 +57,6 @@ func Schemas() map[string]*jsonschema.Schema {
 		"envvar":      EnvVarSchema(),
 		"environment": EnvironmentSchema(),
 		"project":     ProjectSchema(),
+		"service":     ServiceSchema(),
 	}
 }

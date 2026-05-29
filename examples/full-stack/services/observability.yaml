@@ -1,0 +1,19 @@
+api_version: iac-coolify/v1
+kind: Service
+metadata:
+  name: observability-stack
+  project: beenaire
+  environment: production
+spec:
+  destination:
+    server: localhost
+  fqdn: https://observability.beenaire.com
+  instant_deploy: false
+  # docker_compose_path is resolved relative to this file and may not escape the
+  # config tree (see internal/resource/composepath.go).
+  docker_compose_path: docker-compose.yml
+  env_vars:
+    - name: GRAFANA_ADMIN_USER
+      value: admin
+    - name: GRAFANA_ADMIN_PASSWORD
+      value_secret: "${env:GRAFANA_ADMIN_PASSWORD}"

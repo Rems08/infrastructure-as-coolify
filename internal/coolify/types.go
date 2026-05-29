@@ -1,5 +1,7 @@
 package coolify
 
+import "github.com/Rems08/infrastructure-as-coolify/internal/secrets"
+
 // Application mirrors the subset of the Coolify v4 `Application` schema that
 // iac-coolify reads (components.schemas.Application); the full schema has ~90 fields.
 //
@@ -88,4 +90,49 @@ type CreateProjectRequest struct {
 // CreateEnvironmentRequest is the body sent to POST /projects/{uuid}/environments.
 type CreateEnvironmentRequest struct {
 	Name string `json:"name"`
+}
+
+// Service mirrors the subset of components.schemas.Service the resolver and reconciler
+// read. EnvironmentID links it back to its environment (and thereby its project), exactly
+// like Application.EnvironmentID.
+type Service struct {
+	UUID          string `json:"uuid"`
+	Name          string `json:"name"`
+	EnvironmentID int    `json:"environment_id"`
+}
+
+// CreateServiceRequest is the body sent to POST /services. Exactly one of Type (one-click
+// template) or DockerComposeRaw (a repository compose file) carries the stack source.
+// DockerComposeRaw holds the decoded compose content; the client base64-encodes it into
+// the wire field, so the decoded form never has to be assembled at the call site.
+type CreateServiceRequest struct {
+	Type            string `json:"type,omitempty"`
+	Name            string `json:"name,omitempty"`
+	Description     string `json:"description,omitempty"`
+	ProjectUUID     string `json:"project_uuid"`
+	EnvironmentName string `json:"environment_name,omitempty"`
+	EnvironmentUUID string `json:"environment_uuid,omitempty"`
+	ServerUUID      string `json:"server_uuid"`
+	InstantDeploy   bool   `json:"instant_deploy"`
+
+	DockerComposeRaw string `json:"-"` // decoded; base64-encoded by the client
+}
+
+// UpdateServiceRequest is the partial body sent to PATCH /services/{uuid}. DockerComposeRaw
+// holds the decoded compose content; the client base64-encodes it.
+type UpdateServiceRequest struct {
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+
+	DockerComposeRaw string `json:"-"` // decoded; base64-encoded by the client
+}
+
+// ServiceEnvVar is a service environment variable. When Secret is set it is revealed at
+// the HTTP boundary in place of Value, so a sensitive value never has to be carried as a
+// plain string by the caller.
+type ServiceEnvVar struct {
+	UUID   string         `json:"uuid,omitempty"`
+	Key    string         `json:"key"`
+	Value  string         `json:"value"`
+	Secret secrets.Secret `json:"-"`
 }

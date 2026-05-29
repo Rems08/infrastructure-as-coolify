@@ -75,20 +75,34 @@ coolify/
   environments/<env>/applications/<app>.yaml     # kind: Application
   environments/<env>/databases/<db>.yaml         # kind: Database (8 engines)
   environments/<env>/envvars/<set>.yaml          # kind: EnvVar (shared, referenced via env_vars_from)
+  services/<svc>.yaml                            # kind: Service (docker-compose stack)
 ```
 
-Supported resource kinds: **Project**, **Environment**, **Application**, **Database**
-(`postgresql`, `mysql`, `mariadb`, `mongodb`, `redis`, `keydb`, `dragonfly`, `clickhouse`),
-and standalone **EnvVar** sets that an Application merges in by name (`env_vars_from`).
-`apply` creates projects and environments before the applications that reference them.
+Supported resource kinds: **Project**, **Environment**, **Application**, **Service**,
+**Database** (`postgresql`, `mysql`, `mariadb`, `mongodb`, `redis`, `keydb`, `dragonfly`,
+`clickhouse`), and standalone **EnvVar** sets that an Application merges in by name
+(`env_vars_from`). `apply` creates projects and environments before the applications and
+services that reference them.
+
+A **Service** is a docker-compose stack. It sources its definition from exactly one of:
+
+- `docker_compose_path` — a relative path to a `docker-compose.yml` in your repository.
+  The path may not be absolute and may not resolve outside the config tree (a hostile
+  compose path can never read `/etc/passwd`); the file is base64-encoded and sent to
+  Coolify on `apply`.
+- `type` — a Coolify one-click template identifier such as `gitea-with-mysql`.
 
 > **`apply` build packs:** the `Application` schema currently models a prebuilt image, so
 > `build_pack: dockerimage` is the build pack `apply` can create today. `dockerfile`,
 > `nixpacks` and `docker-compose` validate and `plan`, but creating them needs source
 > fields (a Dockerfile body, or a git repository) the schema does not yet declare.
 
+> **Service domains:** Coolify binds domains per docker-compose sub-service, so a
+> Service's `fqdn` is advisory metadata for now and is not applied on create.
+
 See [`examples/`](examples/) and the generated [`docs/reference/`](docs/reference/)
-(`project.md`, `environment.md`, `application.md`, `database.md`, `envvar.md` + JSON schemas).
+(`project.md`, `environment.md`, `application.md`, `service.md`, `database.md`,
+`envvar.md` + JSON schemas).
 
 ## Viewing secret values
 

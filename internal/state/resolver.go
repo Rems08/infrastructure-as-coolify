@@ -54,19 +54,20 @@ type resolverClient interface {
 	ListEnvironments(ctx context.Context, projectUUID string) ([]coolify.Environment, error)
 	ListServers(ctx context.Context) ([]coolify.Server, error)
 	ListApplications(ctx context.Context) ([]coolify.Application, error)
+	ListServices(ctx context.Context) ([]coolify.Service, error)
 }
 
 // Resolve builds the logical-key → identifier map from live Coolify state using only
 // documented v4 endpoints (GET /projects, /projects/{uuid}/environments, /servers,
-// /applications). The mapped value is whatever the API uses to address the resource: a
-// UUID for projects, servers and applications; the name for environments (which have no
-// UUID and are addressed by environment_name_or_uuid). It joins each application's
-// environment_id back to its environment and project names.
+// /applications, /services). The mapped value is whatever the API uses to address the
+// resource: a UUID for projects, servers, applications and services; the name for
+// environments (which have no UUID and are addressed by environment_name_or_uuid). It
+// joins each application's and service's environment_id back to its environment and
+// project names.
 //
-// Databases and Services are intentionally out of scope: their list responses are
-// undocumented placeholders in the pinned OpenAPI spec (escalation #2), so resolving them
-// would mean inventing the response shape. Live resolution for those kinds lands once the
-// upstream spec documents them.
+// Databases remain out of scope: their list response is an undocumented placeholder in
+// the pinned OpenAPI spec, so resolving them would mean inventing the response shape.
+// Live resolution for databases lands once the upstream spec documents them.
 func Resolve(ctx context.Context, client resolverClient) (Map, error) {
 	projects, err := client.ListProjects(ctx)
 	if err != nil {
@@ -104,22 +105,32 @@ func Resolve(ctx context.Context, client resolverClient) (Map, error) {
 		return nil, fmt.Errorf("resolve: list applications: %w", err)
 	}
 	for _, a := range apps {
-		env, ok := envByID[a.EnvironmentID]
-		if !ok {
-			continue // app in an environment we couldn't enumerate; skip rather than mis-key
-		}
-		project, ok := projectByID[env.ProjectID]
-		if !ok {
-			continue
-		}
-		m[ResourceKey{
-			Project:     project.Name,
-			Environment: env.Name,
-			Kind:        resource.KindApplication,
-			Name:        a.Name,
-		}] = a.UUID
+		mapChild(m, envByID, projectByID, resource.KindApplication, a.Name, a.UUID, a.EnvironmentID)
+	}
+
+	services, err := client.ListServices(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("resolve: list services: %w", err)
+	}
+	for _, s := range services {
+		mapChild(m, envByID, projectByID, resource.KindService, s.Name, s.UUID, s.EnvironmentID)
 	}
 	return m, nil
+}
+
+// mapChild keys an application or service by its (project, environment, name) coordinates,
+// resolved from its environment_id. An item in an environment we couldn't enumerate is
+// skipped rather than mis-keyed.
+func mapChild(m Map, envByID map[int]coolify.Environment, projectByID map[int]coolify.Project, kind, name, uuid string, envID int) {
+	env, ok := envByID[envID]
+	if !ok {
+		return
+	}
+	project, ok := projectByID[env.ProjectID]
+	if !ok {
+		return
+	}
+	m[ResourceKey{Project: project.Name, Environment: env.Name, Kind: kind, Name: name}] = uuid
 }
 
 // Save writes the resolved map to an opt-in JSON cache at path (used by --state-cache).

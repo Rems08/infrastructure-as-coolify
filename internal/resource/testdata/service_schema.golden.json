@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Rems08/infrastructure-as-coolify/internal/resource/service",
+  "$ref": "#/$defs/Service",
+  "$defs": {
+    "EnvVarEntry": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "value_secret": {
+          "type": "string",
+          "pattern": "^\\$\\{(env|sops):[^}]+\\}$"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "Service": {
+      "properties": {
+        "api_version": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/ServiceMeta"
+        },
+        "spec": {
+          "$ref": "#/$defs/ServiceSpec"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "api_version",
+        "kind",
+        "metadata",
+        "spec"
+      ]
+    },
+    "ServiceDestination": {
+      "properties": {
+        "server": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "server"
+      ]
+    },
+    "ServiceMeta": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "project",
+        "environment"
+      ]
+    },
+    "ServiceSpec": {
+      "properties": {
+        "destination": {
+          "$ref": "#/$defs/ServiceDestination"
+        },
+        "description": {
+          "type": "string"
+        },
+        "fqdn": {
+          "type": "string"
+        },
+        "instant_deploy": {
+          "type": "boolean"
+        },
+        "docker_compose_path": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "env_vars": {
+          "items": {
+            "$ref": "#/$defs/EnvVarEntry"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "destination"
+      ]
+    }
+  }
+}

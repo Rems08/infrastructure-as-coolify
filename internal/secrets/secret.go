@@ -34,6 +34,10 @@ type Secret struct {
 	value  string // unexported — no reflection access by design
 	source Source
 	origin string // "${env:DATABASE_URL}" or "${sops:stripe.key}" — safe to log
+	// pending marks a ${sops:path} reference parsed but not yet decrypted. SOPS resolution
+	// needs the manifest's directory to find the colocated secrets.enc.yaml, which is only
+	// known at config-load time — so the value is filled in a second pass, not at decode.
+	pending bool
 }
 
 // NewFromEnv builds a Secret from an env var (looked up at construction time).
@@ -114,13 +118,31 @@ func (s *Secret) parse(raw string) error {
 		*s = sec
 		return nil
 	}
-	if strings.HasPrefix(raw, "${sops:") && strings.HasSuffix(raw, "}") {
-		return fmt.Errorf("secrets: SOPS sourcing is not supported yet; use ${env:NAME}")
+	if path, ok := sopsRef(raw); ok {
+		*s = Secret{source: SourceSOPS, origin: "${sops:" + path + "}", pending: true}
+		return nil
 	}
 	return fmt.Errorf(
 		"secrets: literal value forbidden, use ${env:NAME} or ${sops:path}, got: %s",
 		redactPreview(raw),
 	)
+}
+
+// sopsRef extracts the dotted path from "${sops:path}", returning ok=false otherwise.
+func sopsRef(raw string) (string, bool) {
+	if !strings.HasPrefix(raw, "${sops:") || !strings.HasSuffix(raw, "}") {
+		return "", false
+	}
+	return strings.TrimSuffix(strings.TrimPrefix(raw, "${sops:"), "}"), true
+}
+
+// IsPendingSOPS reports whether s is a ${sops:path} reference awaiting decryption.
+func (s Secret) IsPendingSOPS() bool { return s.pending }
+
+// SOPSPath returns the dotted key of a pending SOPS reference (e.g. "db.password").
+func (s Secret) SOPSPath() string {
+	path, _ := sopsRef(s.origin)
+	return path
 }
 
 // envRef extracts NAME from "${env:NAME}", returning ok=false for any other input.

@@ -1,7 +1,10 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/Rems08/infrastructure-as-coolify/internal/resource"
@@ -151,6 +154,43 @@ func TestInterpolationGenericParamFields(t *testing.T) {
 			t.Errorf("service fields not resolved: %+v", svc)
 		}
 	})
+}
+
+// TestLoadApplicationSOPSMissingFile asserts a ${sops:path} reference is parsed as a
+// pending secret and that resolution fails with a clear error when no secrets.enc.yaml is
+// colocated with the manifest.
+func TestLoadApplicationSOPSMissingFile(t *testing.T) {
+	dir := t.TempDir()
+	manifest := filepath.Join(dir, "application.yaml")
+	doc := `api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: api
+  project: beenaire
+  environment: staging
+spec:
+  build_pack: dockerimage
+  image:
+    name: registry/api
+    tag: v1
+  port: 8080
+  destination:
+    server: localhost
+    network: coolify
+  env_vars:
+    - name: DATABASE_URL
+      value_secret: "${sops:databases.staging.password}"
+`
+	if err := os.WriteFile(manifest, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadApplication(manifest)
+	if err == nil {
+		t.Fatal("want error: ${sops:} reference without a colocated secrets.enc.yaml")
+	}
+	if !strings.Contains(err.Error(), "secrets.enc.yaml") {
+		t.Errorf("error = %q, want mention of the missing secrets.enc.yaml", err)
+	}
 }
 
 // TestResolveEnvInterpolation_IntCast verifies the downstream int-parse contract:

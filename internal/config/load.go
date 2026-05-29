@@ -40,6 +40,9 @@ func LoadApplication(path string) (resource.Application, error) {
 	if err := interpolateEntries(app.Spec.EnvVars); err != nil {
 		return app, fmt.Errorf("%s: %w", path, err)
 	}
+	if err := resolveSecretEntries(path, app.Spec.EnvVars); err != nil {
+		return app, fmt.Errorf("%s: %w", path, err)
+	}
 	return app, nil
 }
 
@@ -48,6 +51,9 @@ func LoadDatabase(path string) (resource.Database, error) {
 	var db resource.Database
 	if err := loadStrict(path, &db); err != nil {
 		return db, err
+	}
+	if err := resolveSecret(path, &db.Spec.Password); err != nil {
+		return db, fmt.Errorf("%s: password: %w", path, err)
 	}
 	return db, nil
 }
@@ -63,6 +69,9 @@ func LoadEnvVar(path string) (resource.EnvVar, error) {
 		return ev, fmt.Errorf("%s: %w", path, err)
 	}
 	if err := interpolateEntries(ev.Spec.Vars); err != nil {
+		return ev, fmt.Errorf("%s: %w", path, err)
+	}
+	if err := resolveSecretEntries(path, ev.Spec.Vars); err != nil {
 		return ev, fmt.Errorf("%s: %w", path, err)
 	}
 	return ev, nil
@@ -104,6 +113,9 @@ func LoadService(path string) (resource.Service, error) {
 		return s, fmt.Errorf("%s: %w", path, err)
 	}
 	if err := interpolateEntries(s.Spec.EnvVars); err != nil {
+		return s, fmt.Errorf("%s: %w", path, err)
+	}
+	if err := resolveSecretEntries(path, s.Spec.EnvVars); err != nil {
 		return s, fmt.Errorf("%s: %w", path, err)
 	}
 	return s, nil

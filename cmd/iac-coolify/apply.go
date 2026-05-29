@@ -155,13 +155,18 @@ func buildOperations(ctx context.Context, cmd *cobra.Command, client *coolify.Cl
 	if err != nil {
 		return nil, err
 	}
+	dbs, err := config.LoadDatabases(opts.target)
+	if err != nil {
+		return nil, err
+	}
 
-	if vErr := validateSelection(cmd, opts.only, opts.envFilter, opts.target, projects, envs, apps, services); vErr != nil {
+	if vErr := validateSelection(cmd, opts.only, opts.envFilter, opts.target, projects, envs, apps, services, dbs); vErr != nil {
 		return nil, vErr
 	}
 	envs = filterByEnv(envs, opts.envFilter, func(e resource.Environment) string { return e.Metadata.Name })
 	apps = filterByEnv(apps, opts.envFilter, func(a resource.Application) string { return a.Metadata.Environment })
 	services = filterByEnv(services, opts.envFilter, func(ls config.LoadedService) string { return ls.Service.Metadata.Environment })
+	dbs = filterByEnv(dbs, opts.envFilter, func(d resource.Database) string { return d.Metadata.Environment })
 
 	ops := projectEnvOps(projects, envs, resolved, opts.only)
 	appOps, err := applicationOps(ctx, client, resolved, apps, opts.only)
@@ -169,13 +174,18 @@ func buildOperations(ctx context.Context, cmd *cobra.Command, client *coolify.Cl
 		return nil, err
 	}
 	ops = append(ops, appOps...)
-	return append(ops, serviceOps(services, resolved, opts.only)...), nil
+	ops = append(ops, serviceOps(services, resolved, opts.only)...)
+	dbOps, err := databaseOps(ctx, client, resolved, dbs, opts.only)
+	if err != nil {
+		return nil, err
+	}
+	return append(ops, dbOps...), nil
 }
 
 // validateSelection rejects a --env/--target combination that matches no declared resource
 // before any Coolify call is made. Projects are cross-environment, so they count toward a name
 // selection but never restrict the environment universe.
-func validateSelection(cmd *cobra.Command, only string, envFilter []string, path string, projects []resource.Project, envs []resource.Environment, apps []resource.Application, services []config.LoadedService) error {
+func validateSelection(cmd *cobra.Command, only string, envFilter []string, path string, projects []resource.Project, envs []resource.Environment, apps []resource.Application, services []config.LoadedService, dbs []resource.Database) error {
 	scope := newEnvScope(only, envFilter)
 	for _, p := range projects {
 		scope.addCrossEnv(p.Metadata.Name)
@@ -188,6 +198,9 @@ func validateSelection(cmd *cobra.Command, only string, envFilter []string, path
 	}
 	for _, ls := range services {
 		scope.add(ls.Service.Metadata.Name, ls.Service.Metadata.Environment)
+	}
+	for _, d := range dbs {
+		scope.add(d.Metadata.Name, d.Metadata.Environment)
 	}
 	return scope.validate(cmd, path)
 }
@@ -258,6 +271,42 @@ func applicationOp(ctx context.Context, client *coolify.Client, resolved state.M
 		return apply.Operation{}, false, nil
 	}
 	return apply.ApplicationOp(apply.OpUpdate, app, changes), true, nil
+}
+
+// databaseOps diffs each database against its live state and returns the operations needed
+// to converge the ones that differ.
+func databaseOps(ctx context.Context, client *coolify.Client, resolved state.Map, dbs []resource.Database, only string) ([]apply.Operation, error) {
+	var ops []apply.Operation
+	for _, db := range dbs {
+		if !selected(only, db.Metadata.Name) {
+			continue
+		}
+		op, change, err := databaseOp(ctx, client, resolved, db)
+		if err != nil {
+			return nil, err
+		}
+		if change {
+			ops = append(ops, op)
+		}
+	}
+	return ops, nil
+}
+
+// databaseOp diffs a database against its live state and returns the operation to converge
+// it, or change=false when it is already up to date.
+func databaseOp(ctx context.Context, client *coolify.Client, resolved state.Map, db resource.Database) (apply.Operation, bool, error) {
+	actual, err := remoteDatabase(ctx, client, resolved, db)
+	if err != nil {
+		return apply.Operation{}, false, err
+	}
+	changes := plan.Diff(plan.FromDatabase(db), actual)
+	if actual == nil {
+		return apply.DatabaseOp(apply.OpCreate, db, changes), true, nil
+	}
+	if len(changes) == 0 {
+		return apply.Operation{}, false, nil
+	}
+	return apply.DatabaseOp(apply.OpUpdate, db, changes), true, nil
 }
 
 func selected(only, name string) bool { return only == "" || only == name }

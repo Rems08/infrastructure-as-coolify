@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Rems08/infrastructure-as-coolify/internal/apply"
+	"github.com/Rems08/infrastructure-as-coolify/internal/plan"
 	"github.com/Rems08/infrastructure-as-coolify/internal/resource"
 	"github.com/Rems08/infrastructure-as-coolify/internal/secrets"
 	"github.com/Rems08/infrastructure-as-coolify/internal/state"
@@ -159,6 +160,70 @@ func TestAuditLogIncludesActor(t *testing.T) {
 	e := recordAppCreate(t, app, resolved)
 	if e.Actor != "ci-runner-7" {
 		t.Errorf("Actor = %q, want ci-runner-7", e.Actor)
+	}
+}
+
+// TestAudit_DatabaseCredentialsRedacted drives a full create+update+delete lifecycle for
+// three engines whose passwords carry distinct sentinel values, then asserts the audit log
+// records each credential's source declaration but never any resolved value.
+func TestAudit_DatabaseCredentialsRedacted(t *testing.T) {
+	engines := []struct {
+		name, engine, envVar, sentinel string
+	}{
+		{"pg", "postgresql", "PG_PW", "pg-sentinel-do-not-leak"},
+		{"cache", "redis", "REDIS_PW", "redis-sentinel-do-not-leak"},
+		{"docs", "mongodb", "MONGO_PW", "mongo-sentinel-do-not-leak"},
+	}
+	resolved := state.Map{
+		state.ResourceKey{Kind: resource.KindProject, Name: "beenaire"}: "proj-uuid",
+		state.ResourceKey{Kind: state.KindServer, Name: "localhost"}:    "srv-uuid",
+	}
+	path := filepath.Join(t.TempDir(), "audit.log")
+	eng := apply.NewEngine(&mockClient{}, resolved, apply.NewAuditor(path))
+
+	for _, e := range engines {
+		t.Setenv(e.envVar, e.sentinel)
+		pw, err := secrets.NewFromEnv(e.envVar)
+		if err != nil {
+			t.Fatal(err)
+		}
+		db := resource.Database{
+			Metadata: resource.DatabaseMeta{Name: e.name, Project: "beenaire", Environment: "staging"},
+			Spec: resource.DatabaseSpec{
+				Engine:      e.engine,
+				Image:       e.engine + ":1",
+				Destination: resource.DestinationRef{Server: "localhost", Network: "coolify"},
+				Password:    pw,
+			},
+		}
+		imageChange := []plan.Change{{Op: plan.OpUpdate, Path: "Database." + e.name + ".image", New: e.engine + ":2"}}
+		for _, op := range []apply.Operation{
+			apply.DatabaseOp(apply.OpCreate, db, nil),
+			apply.DatabaseOp(apply.OpUpdate, db, imageChange),
+			apply.DatabaseOp(apply.OpDelete, db, nil),
+		} {
+			if _, err := eng.Apply(context.Background(), []apply.Operation{op}); err != nil {
+				t.Fatalf("apply %s %s: %v", op.Op, e.name, err)
+			}
+		}
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := string(data)
+	for _, e := range engines {
+		if strings.Contains(log, e.sentinel) {
+			t.Errorf("audit log leaked the %s credential value", e.engine)
+		}
+		if !strings.Contains(log, "${env:"+e.envVar+"}") {
+			t.Errorf("audit log should record the %s credential source ${env:%s}", e.engine, e.envVar)
+		}
+	}
+	// Nine operations (3 engines × create+update+delete) must each produce one log line.
+	if lines := strings.Count(strings.TrimSpace(log), "\n") + 1; lines != 9 {
+		t.Errorf("got %d audit lines, want 9", lines)
 	}
 }
 

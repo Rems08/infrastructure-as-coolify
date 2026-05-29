@@ -102,11 +102,11 @@ func TestApply_EnvFilter_ProjectAndEnvironmentKinds(t *testing.T) {
 	// Staging selects the project (cross-environment), the staging environment, the staging
 	// application and the staging service — but not the production environment or application.
 	got := applyDryRun(t, dir, "--env", "staging")
-	if got.ToAdd != 4 {
-		t.Errorf("--env staging to_add = %d, want 4 (project + env staging + app + service)\n%v", got.ToAdd, got.Operations)
+	if got.ToAdd != 5 {
+		t.Errorf("--env staging to_add = %d, want 5 (project + env staging + app + service + db)\n%v", got.ToAdd, got.Operations)
 	}
 	joined := strings.Join(got.Operations, "\n")
-	for _, want := range []string{"Project/beenaire", "Environment/beenaire/staging", "back-office", "monitoring"} {
+	for _, want := range []string{"Project/beenaire", "Environment/beenaire/staging", "back-office", "monitoring", "Database/beenaire/staging/pg"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("staging selection missing %q:\n%s", want, joined)
 		}
@@ -120,12 +120,12 @@ func TestApply_EnvFilter_ProjectAndEnvironmentKinds(t *testing.T) {
 
 func TestApply_EnvFilter_NoFilterAndUnion(t *testing.T) {
 	dir := multiEnvDir(t)
-	if got := applyDryRun(t, dir); got.ToAdd != 6 {
-		t.Errorf("no filter to_add = %d, want 6", got.ToAdd)
+	if got := applyDryRun(t, dir); got.ToAdd != 7 {
+		t.Errorf("no filter to_add = %d, want 7", got.ToAdd)
 	}
 	union := applyDryRun(t, dir, "--env", "staging", "--env", "production")
-	if union.ToAdd != 6 {
-		t.Errorf("union to_add = %d, want 6 (every resource)", union.ToAdd)
+	if union.ToAdd != 7 {
+		t.Errorf("union to_add = %d, want 7 (every resource)", union.ToAdd)
 	}
 }
 
@@ -212,9 +212,48 @@ func TestDestroy_EnvFilter(t *testing.T) {
 	if jErr := json.Unmarshal([]byte(out), &got); jErr != nil {
 		t.Fatalf("parse destroy json: %v\n%s", jErr, out)
 	}
-	if got.ToDestroy != 4 {
-		t.Errorf("destroy --env staging to_destroy = %d, want 4 (project + env staging + app + service)\n%v", got.ToDestroy, got.Operations)
+	if got.ToDestroy != 5 {
+		t.Errorf("destroy --env staging to_destroy = %d, want 5 (project + env staging + app + service + db)\n%v", got.ToDestroy, got.Operations)
 	}
+}
+
+func TestApply_DatabaseFilterByEnv(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"project.yaml":  projectManifest("beenaire"),
+		"env-stg.yaml":  envManifest("staging", "beenaire"),
+		"env-prod.yaml": envManifest("production", "beenaire"),
+		"pg.yaml":       dbManifest("pg", "beenaire", "staging", "postgresql", "postgres:18-alpine"),
+		"cache.yaml":    dbManifest("cache", "beenaire", "staging", "redis", "redis:7-alpine"),
+		"prod-db.yaml":  dbManifest("prod-db", "beenaire", "production", "postgresql", "postgres:18-alpine"),
+	}
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// staging holds two databases plus the staging environment and the project; production
+	// holds one database plus its environment and the (cross-env) project.
+	staging := applyDryRun(t, dir, "--env", "staging")
+	gotStaging := countDatabaseOps(staging.Operations)
+	if gotStaging != 2 {
+		t.Errorf("--env staging database ops = %d, want 2 (pg + cache)\n%v", gotStaging, staging.Operations)
+	}
+	production := applyDryRun(t, dir, "--env", "production")
+	gotProd := countDatabaseOps(production.Operations)
+	if gotProd != 1 {
+		t.Errorf("--env production database ops = %d, want 1 (prod-db)\n%v", gotProd, production.Operations)
+	}
+}
+
+func countDatabaseOps(ops []string) int {
+	n := 0
+	for _, op := range ops {
+		if strings.Contains(op, "Database/") {
+			n++
+		}
+	}
+	return n
 }
 
 func TestDestroy_EnvFilter_UnknownEnvRejected(t *testing.T) {

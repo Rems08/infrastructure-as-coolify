@@ -139,6 +139,64 @@ func TestListApplications_RateLimitedRetries(t *testing.T) {
 	}
 }
 
+func TestGetServerResources_OK(t *testing.T) {
+	golden, err := os.ReadFile(filepath.Join("testdata", "server_resources.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(golden)
+	}))
+	defer srv.Close()
+
+	res, err := newTestClient(t, srv.URL).GetServerResources(context.Background(), "srv-abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != "/api/v1/servers/srv-abc/resources" {
+		t.Errorf("path = %q, want /api/v1/servers/srv-abc/resources", gotPath)
+	}
+	if len(res) != 9 {
+		t.Fatalf("got %d resources, want 9", len(res))
+	}
+	// The typed array decodes the discriminating `type` field, not an opaque blob.
+	var standalone int
+	for _, r := range res {
+		if strings.HasPrefix(r.Type, "standalone-") {
+			standalone++
+		}
+	}
+	if standalone != 4 {
+		t.Errorf("standalone resources = %d, want 4", standalone)
+	}
+	if res[3].Name != "pg-restaurant-core-api-staging" || res[3].UUID != "t50fefd4yb1salodq9bipiw3" {
+		t.Errorf("unexpected resource[3]: %+v", res[3])
+	}
+}
+
+func TestGetServerResources_Unauthorized(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"message":"Unauthenticated."}`))
+	}))
+	defer srv.Close()
+
+	_, err := newTestClient(t, srv.URL).GetServerResources(context.Background(), "srv-abc")
+	if err == nil {
+		t.Fatal("want error on 401")
+	}
+	var apiErr *coolify.APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("want APIError 401, got %v", err)
+	}
+	if strings.Contains(err.Error(), testToken) {
+		t.Error("error message leaks the token")
+	}
+}
+
 // cfAccessCapture is a test server that records the CF Access headers it received.
 func cfAccessCapture(t *testing.T, body string) (*httptest.Server, *map[string]string) {
 	t.Helper()

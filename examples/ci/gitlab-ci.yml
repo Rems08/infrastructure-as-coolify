@@ -16,6 +16,11 @@ variables:
   before_script:
     - go install github.com/Rems08/infrastructure-as-coolify/cmd/iac-coolify@latest
     - export PATH="$PATH:$(go env GOPATH)/bin"
+    # Write the private age key (masked, protected CI/CD variable) to an owner-only file;
+    # iac-coolify refuses a group/other-readable key.
+    - install -m 600 /dev/null "$CI_PROJECT_DIR/age.key"
+    - printf '%s' "$SOPS_AGE_KEY" > "$CI_PROJECT_DIR/age.key"
+    - export SOPS_AGE_KEY_FILE="$CI_PROJECT_DIR/age.key"
 
 plan:
   <<: *iac_base

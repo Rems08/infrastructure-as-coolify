@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased] - 2026-05-29
 
+### Added (Wave 4b)
+
+- SOPS + age secrets at rest: `value_secret: "${sops:path}"` is decrypted in memory from a
+  `secrets.enc.yaml` colocated with the manifest (the path is never user-supplied, so there
+  is no traversal surface), navigated by a dotted key such as `databases.staging.password`,
+  and stays `[REDACTED]` everywhere. A group- or world-readable age key file is refused
+  before any decrypt. Worked example in
+  [`examples/secrets-sops/`](examples/secrets-sops/).
+
+### Changed (Wave 4b)
+
+- CI toolchain unified on Go 1.25 and golangci-lint v2, retiring the split that ran the
+  linter under an older Go release. The newer toolchain carries the security fixes the SOPS
+  dependency tree requires, so `govulncheck` stays clean with zero reachable advisories.
+
 ### Added (Wave 4)
 
 - `destroy` command: deletes the declared resources from a live Coolify instance in reverse
@@ -21,13 +36,6 @@ All notable changes to this project are documented here. The format is based on
 - Secrets documentation: a defence-layer overview and supply modes in the README, plus
   CI templates ([`examples/ci/github-actions.yml`](examples/ci/github-actions.yml),
   [`examples/ci/gitlab-ci.yml`](examples/ci/gitlab-ci.yml)).
-
-### Deferred (Wave 4)
-
-- SOPS + age secrets at rest (`value_secret: "${sops:path}"`): the `getsops/sops/v3`
-  library transitively pulls cloud-KMS crypto dependencies whose security fixes require a
-  newer Go toolchain than the pinned linter supports. `${sops:...}` is rejected at parse
-  time until the toolchain question is resolved. Use `${env:...}` meanwhile.
 
 ### Added (Wave 3.5b)
 

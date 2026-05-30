@@ -105,8 +105,9 @@ func Resolve(ctx context.Context, client resolverClient) (Map, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve: list applications: %w", err)
 	}
+	var counts childCounts
 	for _, a := range apps {
-		mapChild(m, envByID, resource.KindApplication, a.Name, a.UUID, a.EnvironmentID)
+		mapChild(ctx, m, envByID, &counts, resource.KindApplication, a.Name, a.UUID, a.EnvironmentID)
 	}
 
 	services, err := client.ListServices(ctx)
@@ -114,8 +115,12 @@ func Resolve(ctx context.Context, client resolverClient) (Map, error) {
 		return nil, fmt.Errorf("resolve: list services: %w", err)
 	}
 	for _, s := range services {
-		mapChild(m, envByID, resource.KindService, s.Name, s.UUID, s.EnvironmentID)
+		mapChild(ctx, m, envByID, &counts, resource.KindService, s.Name, s.UUID, s.EnvironmentID)
 	}
+	slog.InfoContext(ctx, "resolved applications and services",
+		"resolver.children.resolved", counts.resolved,
+		"resolver.children.dropped", counts.dropped,
+	)
 
 	if err := resolveDatabases(ctx, client, servers, m); err != nil {
 		return nil, err
@@ -163,14 +168,29 @@ type envRef struct {
 	project string
 }
 
+// childCounts tallies how many applications and services were keyed versus skipped, so the
+// resolver reports coverage instead of dropping unmapped resources in silence.
+type childCounts struct {
+	resolved int
+	dropped  int
+}
+
 // mapChild keys an application or service by its (project, environment, name) coordinates,
-// resolved from its environment_id. An item in an environment we couldn't enumerate is
-// skipped rather than mis-keyed.
-func mapChild(m Map, envByID map[int]envRef, kind, name, uuid string, envID int) {
+// resolved from its environment_id. An item whose environment_id was not enumerated is
+// counted and logged rather than dropped silently, so a future API divergence surfaces at
+// once instead of leaving environments mysteriously empty.
+func mapChild(ctx context.Context, m Map, envByID map[int]envRef, counts *childCounts, kind, name, uuid string, envID int) {
 	ref, ok := envByID[envID]
 	if !ok {
+		counts.dropped++
+		slog.WarnContext(ctx, "resolve: resource skipped, environment_id not found",
+			"resolver.child.kind", kind,
+			"resolver.child.name", name,
+			"resolver.child.environment_id", envID,
+		)
 		return
 	}
+	counts.resolved++
 	m[ResourceKey{Project: ref.project, Environment: ref.name, Kind: kind, Name: name}] = uuid
 }
 

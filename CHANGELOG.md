@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added (explore)
+
+- `iac-coolify explore` (alias `tui`): a read-only terminal browser over a live Coolify
+  instance, built on Bubble Tea. It walks the project → environment → resource tree and
+  inspects each resource; a service's environment variables are shown as a table, masked by
+  default and revealed only on an explicit keypress. It requires an interactive terminal and
+  Coolify credentials (no offline mode) and never mutates anything. Structured logs are
+  surfaced in an in-app pane rather than printed to the screen.
+
 ### Added (distribution)
 
 - A composite GitHub Action at the repository root: `uses: Rems08/infrastructure-as-coolify@v1`

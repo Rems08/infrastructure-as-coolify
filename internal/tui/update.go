@@ -21,6 +21,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tree = tree{roots: buildTree(msg.m)}
 		m.loading = false
 		m.err = nil
+		return m, loadDesiredCmd(m.configPath)
+	case desiredLoadedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		m.desired = msg.index
 		return m, nil
 	case appDetailMsg:
 		m.detail = ptr(applicationDetail(msg.app))

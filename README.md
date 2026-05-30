@@ -333,14 +333,16 @@ e.g. `printenv DATABASE_URL`. Secrets stay scoped to the tool that owns them (yo
 
 ## Exploring interactively
 
-`iac-coolify explore` (alias `tui`) opens a read-only terminal browser over the live
-Coolify instance — walk the project → environment → resource tree on the left and inspect
-the selected resource on the right. It never mutates anything.
+`iac-coolify explore` (alias `tui`) opens a terminal browser over the live Coolify
+instance — walk the project → environment → resource tree on the left and inspect the
+selected resource on the right. Pass an optional config path to compare desired YAML against
+live state (drift) and to run application lifecycle actions behind a confirm prompt.
 
 ```bash
 export COOLIFY_API_URL=https://coolify.example.com
 export COOLIFY_API_TOKEN=...        # both required; explore has no offline mode
-iac-coolify explore
+iac-coolify explore                 # browse only
+iac-coolify explore ./coolify       # browse + drift against the config in ./coolify
 ```
 
 | Key        | Action                                            |
@@ -349,13 +351,24 @@ iac-coolify explore
 | `↵`        | expand/collapse a container, or open a resource   |
 | `esc`/`backspace` | collapse, or jump to the parent            |
 | `r`        | reveal/hide a service's environment-variable values |
+| `D`        | drift: compare the selected application against its config |
+| `R`/`S`/`U` | restart / stop / start the selected application (asks `[y/N]`) |
 | `L`        | toggle the log pane                               |
 | `q`/`ctrl+c` | quit                                            |
 
 A service shows its environment variables as a table; every value is **masked by default**
 and only shown after you press `r`. Applications and databases show their structural fields
-(no environment-variable table). `explore` requires an interactive terminal — in a pipe or
-CI it exits with an error rather than opening a UI.
+(no environment-variable table).
+
+Press `D` on an application to see its **drift** — the per-field difference between the
+desired config and the live resource, matched by logical name. The drift view is read-only;
+secret fields are never shown in cleartext. It needs a config path; without one it says so.
+
+`R`/`S`/`U` trigger an application **lifecycle** action. Each asks for confirmation first
+(`[y/N]`) so a stray key cannot restart a service, and each action is recorded to the
+append-only audit log (`--audit-log`, default `.iac-coolify/audit.log`). Editing environment
+variables and writing changes back to YAML are not in the browser yet. `explore` requires an
+interactive terminal — in a pipe or CI it exits with an error rather than opening a UI.
 
 ## CI integration
 

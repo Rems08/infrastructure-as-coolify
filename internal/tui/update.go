@@ -34,6 +34,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case LogMsg:
 		m.logs = append(m.logs, msg)
 		return m, nil
+	case driftMsg:
+		m.drift = &driftView{title: msg.title, changes: msg.changes, note: msg.note}
+		m.showDrift = true
+		m.showLogs = false
+		return m, nil
 	case mutationDoneMsg:
 		if msg.err != nil {
 			m.err = msg.err
@@ -70,6 +75,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.startLifecycle(actionStop)
 	case key.Matches(msg, m.keys.Start):
 		return m.startLifecycle(actionStart)
+	case key.Matches(msg, m.keys.Drift):
+		return m.toggleDrift()
 	case key.Matches(msg, m.keys.Logs):
 		m.showLogs = !m.showLogs
 		return m, nil
@@ -78,23 +85,41 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.detail.revealed = !m.detail.revealed
 		}
 		return m, nil
+	}
+	return m.handleNav(msg)
+}
+
+// handleNav applies the tree-navigation keys (up/down/back/open). Navigation mutates the
+// tree in place; opening a leaf returns a command that fetches its detail.
+func (m Model) handleNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
 	case key.Matches(msg, m.keys.Up):
 		m.tree.up()
-		return m, nil
 	case key.Matches(msg, m.keys.Down):
 		m.tree.down()
-		return m, nil
 	case key.Matches(msg, m.keys.Back):
 		m.tree.collapse()
-		return m, nil
 	case key.Matches(msg, m.keys.Open):
 		if leaf := m.tree.toggle(); leaf != nil {
 			m.detail = ptr(loadingDetail(leaf))
 			return m, loadDetailCmd(m.ctx, m.client, leaf)
 		}
-		return m, nil
 	}
 	return m, nil
+}
+
+// toggleDrift closes an open drift pane, or computes drift for the selected application.
+// On any non-application node it is a no-op.
+func (m Model) toggleDrift() (tea.Model, tea.Cmd) {
+	if m.showDrift {
+		m.showDrift = false
+		return m, nil
+	}
+	n := m.tree.selected()
+	if n == nil || !n.isLeaf() || n.kind != resource.KindApplication {
+		return m, nil
+	}
+	return m, driftCmd(m.ctx, m.client, m.configPath, n.key.Name, n.uuid)
 }
 
 // startLifecycle arms a confirmation prompt for a lifecycle action on the selected

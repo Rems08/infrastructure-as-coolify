@@ -16,6 +16,9 @@ var (
 	revealedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 	confirmStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
 	statusStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	addStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	delStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
+	updStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 )
 
 // View renders the whole screen: a header, the tree/detail split (or the log pane), and a
@@ -28,6 +31,8 @@ func (m Model) View() string {
 	switch {
 	case m.loading:
 		b.WriteString(dimStyle.Render("resolving live Coolify state…"))
+	case m.showDrift && m.drift != nil:
+		b.WriteString(renderDrift(m.drift))
 	case m.showLogs:
 		b.WriteString(m.renderLogs())
 	default:

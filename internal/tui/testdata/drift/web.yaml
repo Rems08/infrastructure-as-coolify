@@ -1,0 +1,16 @@
+api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: web
+  project: restaurant-core
+  environment: staging
+spec:
+  build_pack: dockerimage
+  image:
+    name: registry.example.com/web
+    tag: v2-0-0
+  destination:
+    server: localhost
+    network: coolify
+  fqdn: https://web.example.com
+  port: 8080

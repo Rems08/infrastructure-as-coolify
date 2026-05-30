@@ -21,11 +21,13 @@ type Model struct {
 	keys keyMap
 	help help.Model
 
-	tree     tree
-	detail   *detail
-	confirm  *confirmState
-	logs     []LogMsg
-	showLogs bool
+	tree      tree
+	detail    *detail
+	confirm   *confirmState
+	drift     *driftView
+	logs      []LogMsg
+	showLogs  bool
+	showDrift bool
 
 	width, height int
 	loading       bool

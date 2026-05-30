@@ -10,6 +10,7 @@ type keyMap struct {
 	Back    key.Binding
 	Reveal  key.Binding
 	Logs    key.Binding
+	Drift   key.Binding
 	Restart key.Binding
 	Stop    key.Binding
 	Start   key.Binding
@@ -24,6 +25,7 @@ func defaultKeys() keyMap {
 		Back:    key.NewBinding(key.WithKeys("esc", "backspace"), key.WithHelp("esc", "back")),
 		Reveal:  key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reveal")),
 		Logs:    key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "logs")),
+		Drift:   key.NewBinding(key.WithKeys("D"), key.WithHelp("D", "drift")),
 		Restart: key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "restart")),
 		Stop:    key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "stop")),
 		Start:   key.NewBinding(key.WithKeys("U"), key.WithHelp("U", "start")),
@@ -33,14 +35,14 @@ func defaultKeys() keyMap {
 
 // ShortHelp implements help.KeyMap.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Open, k.Reveal, k.Restart, k.Logs, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.Open, k.Reveal, k.Drift, k.Restart, k.Logs, k.Quit}
 }
 
 // FullHelp implements help.KeyMap.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Open, k.Back},
-		{k.Restart, k.Stop, k.Start},
+		{k.Drift, k.Restart, k.Stop, k.Start},
 		{k.Reveal, k.Logs, k.Quit},
 	}
 }

@@ -35,6 +35,12 @@ All notable changes to this project are documented here. The format is based on
   behind a confirmation prompt that captures every key (so a stray press cannot trigger or
   escape a mutation) and is recorded to the append-only audit log. Editing environment
   variables and writing changes back to YAML are not in the browser yet.
+- An application's detail now shows an **ENV VARS (desired)** section read from the matched
+  config (matched by `(environment, name)`, never by filename): a plain value is masked until
+  `r`, and a secret is shown only by its source declaration (`${env:…}`/`${sops:…}`) — the
+  resolved secret value is never read. When no desired Application matches, the section says
+  so. Backed by a new `config.LoadApplicationFiles` primitive that keeps each manifest's
+  source path (`LoadApplications` delegates to it and strips the paths).
 
 ### Added (distribution)
 

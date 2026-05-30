@@ -142,6 +142,31 @@ func TestLoadProjectsAndEnvironments(t *testing.T) {
 	}
 }
 
+func TestLoadApplicationFilesKeepsPath(t *testing.T) {
+	files, err := LoadApplicationFiles(fullProject())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 {
+		t.Fatalf("LoadApplicationFiles = %d files, want 1", len(files))
+	}
+	f := files[0]
+	if f.Application.Metadata.Name != "api" {
+		t.Errorf("application name = %q, want api", f.Application.Metadata.Name)
+	}
+	if filepath.Base(f.Path) != "api.yaml" {
+		t.Errorf("path base = %q, want api.yaml", filepath.Base(f.Path))
+	}
+	// LoadApplications must stay functionally identical to the path-aware primitive.
+	apps, err := LoadApplications(fullProject())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(apps) != len(files) || apps[0].Metadata.Name != f.Application.Metadata.Name {
+		t.Errorf("LoadApplications drifted from LoadApplicationFiles: %+v vs %+v", apps, files)
+	}
+}
+
 func TestValidateInvalidProjectName(t *testing.T) {
 	rep, err := Validate(filepath.Join("testdata", "bad-project.yaml"), false)
 	if err != nil {

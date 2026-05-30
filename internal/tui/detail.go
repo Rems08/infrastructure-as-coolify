@@ -27,28 +27,84 @@ type envRow struct {
 	value string
 }
 
-// detail is the right-hand pane: the fields and (for a service) environment variables of
-// the selected resource. revealed toggles the env-value mask; it is the only place a value
-// is shown, and only after an explicit keypress.
-type detail struct {
-	kind     string
-	title    string
-	fields   []field
-	envs     []envRow
-	revealed bool
+// desiredEnvRow is one environment variable from the desired YAML config. It is leak-proof
+// by construction: a plain value is held verbatim (visible config, maskable like a service
+// value), while a secret carries only its source declaration (${env:…}/${sops:…}) — never a
+// resolved value, which this view never reads.
+type desiredEnvRow struct {
+	name    string
+	display string // plain value, or a secret's source declaration
+	secret  bool
 }
 
-// hasEnvs reports whether the detail carries an environment-variable table (services only),
-// which is what the reveal toggle acts on.
+// detail is the right-hand pane: the fields, the live env table (services only), and the
+// desired env vars (applications with a matched config) of the selected resource. revealed
+// toggles the value mask; it is the only place a plain value is shown, and only after an
+// explicit keypress.
+type detail struct {
+	kind        string
+	title       string
+	fields      []field
+	envs        []envRow
+	desiredEnvs []desiredEnvRow
+	desiredNote string
+	revealed    bool
+}
+
+// hasEnvs reports whether the detail carries a live environment-variable table (services
+// only), which is what the reveal toggle acts on.
 func (d detail) hasEnvs() bool { return len(d.envs) > 0 }
 
-// renderEnvValue returns what the view prints for an env value: the mask unless the user
+// hasDesiredEnvs reports whether the detail carries a desired env-var section.
+func (d detail) hasDesiredEnvs() bool { return len(d.desiredEnvs) > 0 }
+
+// hasMaskableValues reports whether the reveal toggle has anything to act on: a service's
+// live env table, or a plain (non-secret) desired value. Secret desired rows show only their
+// source declaration, so reveal never affects them.
+func (d detail) hasMaskableValues() bool {
+	if d.hasEnvs() {
+		return true
+	}
+	for _, e := range d.desiredEnvs {
+		if !e.secret {
+			return true
+		}
+	}
+	return false
+}
+
+// renderEnvValue returns what the view prints for a live env value: the mask unless the user
 // has revealed values.
 func (d detail) renderEnvValue(v string) string {
 	if d.revealed {
 		return v
 	}
 	return mask
+}
+
+// renderDesiredValue returns what the view prints for a desired env value: a secret's source
+// declaration always (never a value, which is never held), or a plain value masked until
+// revealed.
+func (d detail) renderDesiredValue(e desiredEnvRow) string {
+	if e.secret || d.revealed {
+		return e.display
+	}
+	return mask
+}
+
+// desiredEnvRows projects desired env vars into display rows. A secret row carries the
+// secret's source declaration (Origin) — Reveal is never called, so a resolved secret value
+// never enters the model.
+func desiredEnvRows(entries []resource.EnvVarEntry) []desiredEnvRow {
+	rows := make([]desiredEnvRow, 0, len(entries))
+	for _, e := range entries {
+		if !e.ValueSecret.IsZero() {
+			rows = append(rows, desiredEnvRow{name: e.Name, display: e.ValueSecret.Origin(), secret: true})
+			continue
+		}
+		rows = append(rows, desiredEnvRow{name: e.Name, display: e.Value})
+	}
+	return rows
 }
 
 func applicationDetail(app coolify.Application) detail {

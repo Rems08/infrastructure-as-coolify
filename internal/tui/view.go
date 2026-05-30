@@ -114,6 +114,41 @@ func (m Model) renderDetail() string {
 			b.WriteString(dimStyle.Render("(r to reveal)"))
 		}
 	}
+	if sec := renderDesiredSection(d); sec != "" {
+		b.WriteString(sec)
+		b.WriteByte('\n')
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// renderDesiredSection renders an application's desired env-var section: a note when no
+// desired config matched, or one row per env var (plain values masked until revealed, secret
+// values shown only by their source declaration). It returns "" when there is no section.
+func renderDesiredSection(d *detail) string {
+	if d.desiredNote == "" && !d.hasDesiredEnvs() {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(dimStyle.Render("─ env vars (desired) ─"))
+	b.WriteByte('\n')
+	if d.desiredNote != "" {
+		b.WriteString(dimStyle.Render(d.desiredNote))
+		return b.String()
+	}
+	for _, e := range d.desiredEnvs {
+		if e.secret {
+			fmt.Fprintf(&b, "%-22s 🔒 %s\n", e.name, d.renderDesiredValue(e))
+		} else {
+			fmt.Fprintf(&b, "%-22s %s\n", e.name, d.renderDesiredValue(e))
+		}
+	}
+	if d.hasMaskableValues() {
+		if d.revealed {
+			b.WriteString(revealedStyle.Render("⚠ values revealed (r to hide)"))
+		} else {
+			b.WriteString(dimStyle.Render("(r to reveal)"))
+		}
+	}
 	return strings.TrimRight(b.String(), "\n")
 }
 

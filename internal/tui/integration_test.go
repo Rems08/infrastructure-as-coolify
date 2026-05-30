@@ -63,3 +63,62 @@ func TestIntegration_DriftThenRestart(t *testing.T) {
 		t.Fatal("session did not quit")
 	}
 }
+
+// TestIntegration_DesiredEnvInDetail drives a session that resolves, loads the desired index,
+// opens the web application, and asserts its detail shows the desired env vars leak-proof: a
+// plain value masked until revealed, a secret by its source declaration only.
+func TestIntegration_DesiredEnvInDetail(t *testing.T) {
+	t.Setenv("WEB_DB_URL", "postgres://example")
+	fc := newFakeClient()
+	m := NewModel(context.Background(), fc, fc, WithConfigPath(desiredPath()))
+
+	m = selectApp(t, m)                                // resolve + park on web
+	m, _ = step(t, m, loadDesiredCmd(desiredPath())()) // populate the desired index
+	if _, ok := m.desiredFor("staging", "web"); !ok {
+		t.Fatal("desired index not loaded")
+	}
+
+	m, cmd := step(t, m, tea.KeyMsg{Type: tea.KeyEnter}) // open web
+	if cmd == nil {
+		t.Fatal("opening web returned no detail command")
+	}
+	m, _ = step(t, m, cmd()) // appDetailMsg → attach desired
+
+	if m.detail == nil || !m.detail.hasDesiredEnvs() {
+		t.Fatalf("desired env section not shown for web: %+v", m.detail)
+	}
+	view := m.View()
+	if !strings.Contains(view, "${env:WEB_DB_URL}") {
+		t.Errorf("secret source declaration not shown:\n%s", view)
+	}
+	if strings.Contains(view, "postgres://example") {
+		t.Fatalf("resolved secret value leaked into detail:\n%s", view)
+	}
+	if strings.Contains(view, "production") {
+		t.Errorf("plain value shown before reveal:\n%s", view)
+	}
+	m, _ = step(t, m, keyRunes('r'))
+	if !strings.Contains(m.View(), "production") {
+		t.Errorf("plain value not revealed after r:\n%s", m.View())
+	}
+}
+
+// TestIntegration_NoDesiredConfigNote opens an application when no desired config matches and
+// asserts the detail reports it gracefully rather than crashing or inventing a match.
+func TestIntegration_NoDesiredConfigNote(t *testing.T) {
+	fc := newFakeClient()
+	m := NewModel(context.Background(), fc, fc, WithConfigPath(t.TempDir()))
+
+	m = selectApp(t, m)
+	m, _ = step(t, m, loadDesiredCmd(t.TempDir())()) // empty dir → empty index
+
+	m, cmd := step(t, m, tea.KeyMsg{Type: tea.KeyEnter}) // open web
+	m, _ = step(t, m, cmd())
+
+	if m.detail == nil || m.detail.hasDesiredEnvs() {
+		t.Fatal("unmatched application must carry no desired env rows")
+	}
+	if !strings.Contains(m.View(), "no desired config for this application") {
+		t.Errorf("missing no-desired-config note:\n%s", m.View())
+	}
+}

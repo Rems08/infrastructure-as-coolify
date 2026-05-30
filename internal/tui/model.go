@@ -15,8 +15,9 @@ type Model struct {
 	ctx        context.Context
 	client     explorerClient
 	mutator    mutatorClient
-	auditor    recorder // nil disables persistent audit logging; the slog trace still fires.
-	configPath string   // desired-state root for drift; empty disables the drift view.
+	auditor    recorder     // nil disables persistent audit logging; the slog trace still fires.
+	configPath string       // desired-state root for drift; empty disables the drift view.
+	desired    desiredIndex // desired Applications keyed by (environment, name); loaded after resolve.
 
 	keys keyMap
 	help help.Model

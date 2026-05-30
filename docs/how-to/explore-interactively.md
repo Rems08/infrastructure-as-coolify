@@ -28,7 +28,7 @@ terminal), `explore` exits with an explanatory error instead of opening a UI.
 | `↑`/`↓`, `k`/`j`   | move the cursor                                       |
 | `↵`                | expand/collapse a container, or open a resource       |
 | `esc`/`backspace`  | collapse the node, or jump to its parent              |
-| `r`                | reveal/hide a service's environment-variable values   |
+| `r`                | reveal/hide masked environment-variable values        |
 | `D`                | drift: compare the selected application with its config |
 | `R`/`S`/`U`        | restart / stop / start the selected application (asks `[y/N]`) |
 | `L`                | toggle the log pane                                   |
@@ -58,12 +58,20 @@ to YAML are not in the browser yet.
 
 ## What each resource shows
 
-- **Service** — its environment variables as a table. Every value is **masked** (`••••••`)
-  until you press `r`; pressing it again re-masks them. Revealing is a view toggle on values
-  the read API already returns in cleartext — nothing is decrypted, logged or written.
-- **Application** and **Database** — their structural fields (status, image, build pack,
-  type, …). They carry no environment-variable table on the read path, so the mask toggle
-  does not apply to them.
+- **Service** — its live environment variables as a table. Every value is **masked**
+  (`••••••`) until you press `r`; pressing it again re-masks them. Revealing is a view toggle
+  on values the read API already returns in cleartext — nothing is decrypted, logged or
+  written.
+- **Application** — its structural fields (status, image, build pack, …) and, when a config
+  path is given and a desired Application matches by `(environment, name)`, an **ENV VARS
+  (desired)** section read from the YAML. A plain value is masked until you press `r`; a
+  secret is shown only by its source declaration (`${env:NAME}` / `${sops:path}`) next to a
+  🔒 marker. The resolved secret value is never read or displayed — `r` reveals plain values,
+  never a secret. When no desired Application matches the selected name (or no config path was
+  given), the section says so rather than failing. Editing these values and writing them back
+  to YAML is not in the browser yet.
+- **Database** — its structural fields (status, type, …) only; no environment-variable table
+  on the read path, so the mask toggle does not apply.
 
 Databases that Coolify exposes only through the per-server resource listing carry no
 project or environment, so they appear under a single top-level `databases` group rather

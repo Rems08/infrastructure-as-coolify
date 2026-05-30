@@ -198,14 +198,24 @@ func resolveCompose(root, path string, svc resource.Service) (string, error) {
 	return string(data), nil
 }
 
-// LoadApplications loads and validates every Application under target (a file or a
-// directory). Non-Application resources are skipped. It returns the first error found.
-func LoadApplications(target string) ([]resource.Application, error) {
+// ApplicationFile pairs a validated Application with the path of the file it was loaded
+// from. It is the primitive callers use when they need the source location — to index a
+// resource back to its manifest, for example. LoadApplications strips the path for callers
+// that only want the resources.
+type ApplicationFile struct {
+	Path        string
+	Application resource.Application
+}
+
+// LoadApplicationFiles loads and validates every Application under target (a file or a
+// directory), keeping the source path of each. Non-Application resources are skipped. It
+// returns the first error found.
+func LoadApplicationFiles(target string) ([]ApplicationFile, error) {
 	files, err := collectFiles(target)
 	if err != nil {
 		return nil, err
 	}
-	var apps []resource.Application
+	var apps []ApplicationFile
 	for _, kf := range files {
 		if kf.kind != resource.KindApplication {
 			continue
@@ -217,7 +227,22 @@ func LoadApplications(target string) ([]resource.Application, error) {
 		if vErr := app.Validate(); vErr != nil {
 			return nil, fmt.Errorf("%s: %w", kf.path, vErr)
 		}
-		apps = append(apps, app)
+		apps = append(apps, ApplicationFile{Path: kf.path, Application: app})
+	}
+	return apps, nil
+}
+
+// LoadApplications loads and validates every Application under target (a file or a
+// directory), discarding source paths. Non-Application resources are skipped. It returns
+// the first error found.
+func LoadApplications(target string) ([]resource.Application, error) {
+	files, err := LoadApplicationFiles(target)
+	if err != nil {
+		return nil, err
+	}
+	apps := make([]resource.Application, len(files))
+	for i, f := range files {
+		apps[i] = f.Application
 	}
 	return apps, nil
 }

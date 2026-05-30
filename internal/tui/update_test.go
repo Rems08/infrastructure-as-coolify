@@ -9,6 +9,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/Rems08/infrastructure-as-coolify/internal/resource"
 )
 
 func newTestModel(t *testing.T) Model {
@@ -102,6 +104,35 @@ func TestUpdate_ErrMsgShownNotCrash(t *testing.T) {
 	m, _ = step(t, m, errMsg{errors.New("api down")})
 	if m.err == nil || !strings.Contains(m.View(), "api down") {
 		t.Fatalf("error not surfaced in view: err=%v", m.err)
+	}
+}
+
+func TestLoadDetailCmd_ContainerClearsLoading(t *testing.T) {
+	// A container kind has no detail endpoint; the command must clear the placeholder rather
+	// than return nil (which would leave the pane stuck on "(loading…)").
+	node := &treeNode{label: "staging", kind: resource.KindEnvironment}
+	msg := loadDetailCmd(context.Background(), newFakeClient(), node)()
+	if _, ok := msg.(detailClearedMsg); !ok {
+		t.Fatalf("loadDetailCmd on a container = %T, want detailClearedMsg", msg)
+	}
+}
+
+func TestUpdate_LoadingDetailClearedOnContainerAndError(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		msg  tea.Msg
+	}{
+		{"container", detailClearedMsg{}},
+		{"error", errMsg{errors.New("api down")}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newTestModel(t)
+			m.detail = ptr(loadingDetail(&treeNode{label: "staging", kind: resource.KindEnvironment}))
+			m, _ = step(t, m, tc.msg)
+			if m.detail != nil {
+				t.Errorf("loading detail not cleared by %s: %+v", tc.name, m.detail)
+			}
+		})
 	}
 }
 

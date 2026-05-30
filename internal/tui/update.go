@@ -31,17 +31,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.desired = msg.index
 		return m, nil
-	case appDetailMsg:
-		d := applicationDetail(msg.app)
-		m.attachDesired(&d, msg.env, msg.name)
-		m.detail = &d
-		return m, nil
-	case dbDetailMsg:
-		m.detail = ptr(databaseDetail(msg.db))
-		return m, nil
-	case svcDetailMsg:
-		m.detail = ptr(serviceDetail(msg.name, msg.envs))
-		return m, nil
+	case appDetailMsg, dbDetailMsg, svcDetailMsg, detailClearedMsg:
+		return m.handleDetailMsg(msg)
 	case savedMsg:
 		return m.applySaved(msg)
 	case LogMsg:
@@ -57,6 +48,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		m.err = msg.err
 		m.loading = false
+		m.clearLoadingDetail()
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -78,6 +70,32 @@ func (m Model) applySaved(msg savedMsg) (tea.Model, tea.Cmd) {
 	m.status = "saved " + msg.path
 	m.refreshDesired(m.detail)
 	return m, nil
+}
+
+// handleDetailMsg applies a fetched resource detail, or drops the loading placeholder when the
+// load resolved to a container kind that has no detail endpoint (detailClearedMsg).
+func (m Model) handleDetailMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case appDetailMsg:
+		d := applicationDetail(msg.app)
+		m.attachDesired(&d, msg.env, msg.name)
+		m.detail = &d
+	case dbDetailMsg:
+		m.detail = ptr(databaseDetail(msg.db))
+	case svcDetailMsg:
+		m.detail = ptr(serviceDetail(msg.name, msg.envs))
+	case detailClearedMsg:
+		m.clearLoadingDetail()
+	}
+	return m, nil
+}
+
+// clearLoadingDetail drops a placeholder detail still waiting on a load, so an error or a
+// container with no endpoint never leaves the pane stuck on "(loading…)".
+func (m *Model) clearLoadingDetail() {
+	if m.detail != nil && m.detail.loading {
+		m.detail = nil
+	}
 }
 
 // applyMutationDone records the outcome of a lifecycle action in the status or error line.

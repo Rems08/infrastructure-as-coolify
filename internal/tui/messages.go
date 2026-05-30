@@ -33,6 +33,11 @@ type svcDetailMsg struct {
 // program.
 type errMsg struct{ err error }
 
+// detailClearedMsg clears a placeholder detail. It is returned when a detail load resolves to
+// a node with no fetchable endpoint (a container kind), so the pane never sticks on
+// "(loading…)" waiting for a message that would otherwise never arrive.
+type detailClearedMsg struct{}
+
 // resolveCmd resolves the live UUID map. The client satisfies state.Resolve's narrower
 // interface, so it is passed straight through.
 func resolveCmd(ctx context.Context, client explorerClient) tea.Cmd {
@@ -70,7 +75,7 @@ func loadDetailCmd(ctx context.Context, client explorerClient, node *treeNode) t
 			}
 			return svcDetailMsg{name: name, envs: envs}
 		default:
-			return nil
+			return detailClearedMsg{}
 		}
 	}
 }

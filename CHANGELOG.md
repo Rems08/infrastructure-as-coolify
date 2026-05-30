@@ -33,14 +33,22 @@ All notable changes to this project are documented here. The format is based on
   difference. It is read-only and never prints a secret's value.
 - Application lifecycle actions (`R` restart, `S` stop, `U` start): each runs asynchronously
   behind a confirmation prompt that captures every key (so a stray press cannot trigger or
-  escape a mutation) and is recorded to the append-only audit log. Editing environment
-  variables and writing changes back to YAML are not in the browser yet.
+  escape a mutation) and is recorded to the append-only audit log.
 - An application's detail now shows an **ENV VARS (desired)** section read from the matched
   config (matched by `(environment, name)`, never by filename): a plain value is masked until
   `r`, and a secret is shown only by its source declaration (`${env:…}`/`${sops:…}`) — the
   resolved secret value is never read. When no desired Application matches, the section says
   so. Backed by a new `config.LoadApplicationFiles` primitive that keeps each manifest's
   source path (`LoadApplications` delegates to it and strips the paths).
+- Editing and write-back of an application's desired env vars: `↑`/`↓` select a row, `e` opens
+  it in a text field that captures every key, `↵` stages the edit (changed rows marked `*`),
+  `s` writes the patched manifest back to its YAML file via `config.WriteApplication`
+  (atomic, audited as a `write-back` entry) and `d` discards staged edits. A secret is edited
+  as its `${env:…}`/`${sops:…}` source declaration — validated to stay a reference, never
+  downgraded to a literal — and its resolved value is never read or written; a new
+  `secrets.NewReference` builds an origin-only Secret for the round-trip. Quitting with unsaved
+  edits asks for confirmation. The write-back targets the desired YAML only; it does not push
+  to Coolify.
 
 ### Added (distribution)
 

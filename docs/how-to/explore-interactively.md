@@ -2,9 +2,10 @@
 
 `iac-coolify explore` (alias `tui`) opens a terminal browser over a live Coolify instance.
 It walks the project → environment → resource tree and inspects each resource. Browsing and
-the drift view are read-only; the only writes it can make are application **lifecycle**
-actions (restart/stop/start), and each one asks for confirmation first. There is no create,
-update, delete, or environment-variable editing in the browser yet.
+the drift view are read-only. It can make two kinds of write: application **lifecycle**
+actions (restart/stop/start), each behind a confirmation prompt; and **write-back of an
+application's desired env vars** to its YAML file. There is no create or delete in the browser
+yet, and write-back never pushes to Coolify — run `iac-coolify apply` for that.
 
 ## Prerequisites
 
@@ -31,6 +32,8 @@ terminal), `explore` exits with an explanatory error instead of opening a UI.
 | `r`                | reveal/hide masked environment-variable values        |
 | `D`                | drift: compare the selected application with its config |
 | `R`/`S`/`U`        | restart / stop / start the selected application (asks `[y/N]`) |
+| `e`                | edit the selected desired env var                     |
+| `s`/`d`            | save edits back to YAML / discard them                |
 | `L`                | toggle the log pane                                   |
 | `q`/`ctrl+c`       | quit                                                  |
 
@@ -53,8 +56,26 @@ confirmation prompt (`restart application "web"? [y/N]`) that captures every key
 press can neither trigger the action nor quit the program mid-prompt — only `y` proceeds,
 `n`/`esc` cancels. Every action runs asynchronously and is recorded to the append-only audit
 log (set with `--audit-log`, default `.iac-coolify/audit.log`); the entry names the action
-and resource and carries no secret. Editing environment variables and writing changes back
-to YAML are not in the browser yet.
+and resource and carries no secret.
+
+## Editing desired env vars
+
+When an application's **ENV VARS (desired)** section is shown, `↑`/`↓` move a cursor over the
+rows and `e` opens the selected one for editing in a text field that captures every key, so a
+stray `q` or `s` cannot quit or save mid-typing — `↵` confirms, `esc` cancels.
+
+- A **plain** value is pre-filled with the literal and edited freely.
+- A **secret** is pre-filled with its **source declaration** (`${env:NAME}` / `${sops:path}`)
+  and edited as a reference: the input must stay a `${env:}`/`${sops:}` reference or the edit
+  is rejected. The browser never holds a secret's resolved value, so it can neither display
+  nor write one — a secret can only ever be re-pointed at another reference.
+
+Confirmed edits are staged in memory and the changed rows are marked `*`; nothing touches disk
+until you press `s`. `s` writes the patched manifest back to its YAML file with an atomic
+temp-file-then-rename and records a `write-back` entry to the audit log; `d` discards the
+staged edits and restores the on-disk values. Quitting with unsaved edits asks for
+confirmation first. The write-back edits the **desired** YAML only — it does not push to
+Coolify, so run `iac-coolify apply` to reconcile the live instance afterwards.
 
 ## What each resource shows
 
@@ -68,8 +89,8 @@ to YAML are not in the browser yet.
   secret is shown only by its source declaration (`${env:NAME}` / `${sops:path}`) next to a
   🔒 marker. The resolved secret value is never read or displayed — `r` reveals plain values,
   never a secret. When no desired Application matches the selected name (or no config path was
-  given), the section says so rather than failing. Editing these values and writing them back
-  to YAML is not in the browser yet.
+  given), the section says so rather than failing. These rows can be edited and written back to
+  YAML — see [Editing desired env vars](#editing-desired-env-vars).
 - **Database** — its structural fields (status, type, …) only; no environment-variable table
   on the read path, so the mask toggle does not apply.
 

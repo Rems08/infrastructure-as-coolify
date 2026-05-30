@@ -353,6 +353,7 @@ iac-coolify explore ./coolify       # browse + drift against the config in ./coo
 | `r`        | reveal/hide masked environment-variable values    |
 | `D`        | drift: compare the selected application against its config |
 | `R`/`S`/`U` | restart / stop / start the selected application (asks `[y/N]`) |
+| `e`/`s`/`d` | edit the selected desired env var / save edits to YAML / discard them |
 | `L`        | toggle the log pane                               |
 | `q`/`ctrl+c` | quit                                            |
 
@@ -369,9 +370,17 @@ secret fields are never shown in cleartext. It needs a config path; without one 
 
 `R`/`S`/`U` trigger an application **lifecycle** action. Each asks for confirmation first
 (`[y/N]`) so a stray key cannot restart a service, and each action is recorded to the
-append-only audit log (`--audit-log`, default `.iac-coolify/audit.log`). Editing the desired
-env vars and writing changes back to YAML are not in the browser yet. `explore` requires an
+append-only audit log (`--audit-log`, default `.iac-coolify/audit.log`). `explore` requires an
 interactive terminal — in a pipe or CI it exits with an error rather than opening a UI.
+
+In an application's **ENV VARS (desired)** section, `↑`/`↓` select a row and `e` opens it for
+editing. A plain value is edited as-is; a secret is edited as its **source declaration** — the
+input must stay a `${env:…}`/`${sops:…}` reference, so a secret can never be turned into a
+literal and its resolved value is never read or written. Edited rows are marked `*` and held
+unsaved until you press `s`, which writes the patched manifest back to its YAML file (atomic
+write, recorded to the audit log); `d` discards the pending edits. Quitting with unsaved edits
+asks for confirmation. The write-back updates the **desired** YAML only — run `iac-coolify
+apply` to push it to Coolify.
 
 ## CI integration
 

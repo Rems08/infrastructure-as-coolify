@@ -99,6 +99,26 @@ func TestMapApplication_DockerimageComplete(t *testing.T) {
 	}
 }
 
+func TestMapApplication_DedupesEnvKeys(t *testing.T) {
+	app := coolify.Application{
+		Name: "api", BuildPack: "dockerimage",
+		DockerRegistryImageName: "registry/api", DockerRegistryImageTag: "v1", PortsExposes: "8000", EnvironmentID: 10,
+	}
+	// The live API can return the same key twice (build-time and runtime copies).
+	envs := []coolify.ServiceEnvVar{
+		{Key: "LOG_LEVEL", Value: "info"},
+		{Key: "PORT", Value: "8000"},
+		{Key: "LOG_LEVEL", Value: "info"},
+	}
+	mapped, keys := mapApplication(app, "localhost", "coolify", envRef{project: "p", name: "staging"}, envs)
+	if len(mapped.Spec.EnvVars) != 2 {
+		t.Errorf("duplicate env keys must collapse to one entry, got %d", len(mapped.Spec.EnvVars))
+	}
+	if len(keys) != 2 {
+		t.Errorf("referenced keys must be de-duplicated, got %v", keys)
+	}
+}
+
 func TestMapApplication_GitPartial(t *testing.T) {
 	app := coolify.Application{
 		Name:          "worker",

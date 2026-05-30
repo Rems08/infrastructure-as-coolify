@@ -53,8 +53,16 @@ func mapApplication(app coolify.Application, server, network string, env envRef,
 			PortsExposes:  app.PortsExposes,
 		}
 	}
+	// The API can return a key more than once (e.g. a build-time and a runtime copy);
+	// a desired-state manifest carries one entry per key, so duplicates are collapsed to
+	// the first occurrence.
+	seen := make(map[string]struct{}, len(envs))
 	keys := make([]string, 0, len(envs))
 	for _, e := range envs {
+		if _, dup := seen[e.Key]; dup {
+			continue
+		}
+		seen[e.Key] = struct{}{}
 		spec.EnvVars = append(spec.EnvVars, resource.EnvVarEntry{Name: e.Key, Value: envReference(e.Key)})
 		keys = append(keys, e.Key)
 	}

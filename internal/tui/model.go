@@ -8,35 +8,66 @@ import (
 )
 
 // Model is the Elm-architecture state of the explore browser. It owns the read-only client,
-// the cancelable context shared by every command, the navigation tree, the selected
-// resource's detail, and the accumulated log records.
+// the separate mutator client used for lifecycle actions, the cancelable context shared by
+// every command, the navigation tree, the selected resource's detail, and the accumulated
+// log records.
 type Model struct {
-	ctx    context.Context
-	client explorerClient
+	ctx        context.Context
+	client     explorerClient
+	mutator    mutatorClient
+	auditor    recorder // nil disables persistent audit logging; the slog trace still fires.
+	configPath string   // desired-state root for drift; empty disables the drift view.
 
 	keys keyMap
 	help help.Model
 
-	tree     tree
-	detail   *detail
-	logs     []LogMsg
-	showLogs bool
+	tree      tree
+	detail    *detail
+	confirm   *confirmState
+	drift     *driftView
+	logs      []LogMsg
+	showLogs  bool
+	showDrift bool
 
 	width, height int
 	loading       bool
+	status        string
 	err           error
 }
 
-// NewModel returns a browser model bound to client and ctx. ctx is the context every API
-// command runs under; cancelling it (on quit) unblocks any in-flight request.
-func NewModel(ctx context.Context, client explorerClient) Model {
-	return Model{
+// Option configures a Model at construction.
+type Option func(*Model)
+
+// WithConfigPath points the drift view at the desired-state config root. Without it, drift
+// is unavailable and the view says so rather than crashing.
+func WithConfigPath(path string) Option { return func(m *Model) { m.configPath = path } }
+
+// WithAuditor wires a persistent audit sink for lifecycle actions. A nil auditor is ignored,
+// leaving only the slog trace.
+func WithAuditor(a recorder) Option {
+	return func(m *Model) {
+		if a != nil {
+			m.auditor = a
+		}
+	}
+}
+
+// NewModel returns a browser model bound to the read-only explorer and the mutator. ctx is
+// the context every API command runs under; cancelling it (on quit) unblocks any in-flight
+// request. A single *coolify.Client may be passed as both arguments.
+func NewModel(ctx context.Context, explorer explorerClient, mutator mutatorClient, opts ...Option) Model {
+	m := Model{
 		ctx:     ctx,
-		client:  client,
+		client:  explorer,
+		mutator: mutator,
 		keys:    defaultKeys(),
 		help:    help.New(),
 		loading: true,
 	}
+	for _, opt := range opts {
+		opt(&m)
+	}
+	return m
 }
 
 // Init kicks off the initial remote resolution.

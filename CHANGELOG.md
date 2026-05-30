@@ -22,12 +22,19 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added (explore)
 
-- `iac-coolify explore` (alias `tui`): a read-only terminal browser over a live Coolify
-  instance, built on Bubble Tea. It walks the project → environment → resource tree and
-  inspects each resource; a service's environment variables are shown as a table, masked by
-  default and revealed only on an explicit keypress. It requires an interactive terminal and
-  Coolify credentials (no offline mode) and never mutates anything. Structured logs are
-  surfaced in an in-app pane rather than printed to the screen.
+- `iac-coolify explore` (alias `tui`): a terminal browser over a live Coolify instance,
+  built on Bubble Tea. It walks the project → environment → resource tree and inspects each
+  resource; a service's environment variables are shown as a table, masked by default and
+  revealed only on an explicit keypress. It requires an interactive terminal and Coolify
+  credentials (no offline mode). Structured logs are surfaced in an in-app pane rather than
+  printed to the screen.
+- Drift view (`D`): compares the selected application against its desired config (passed as
+  an optional `explore <path>` argument), matched by logical name, and shows the per-field
+  difference. It is read-only and never prints a secret's value.
+- Application lifecycle actions (`R` restart, `S` stop, `U` start): each runs asynchronously
+  behind a confirmation prompt that captures every key (so a stray press cannot trigger or
+  escape a mutation) and is recorded to the append-only audit log. Editing environment
+  variables and writing changes back to YAML are not in the browser yet.
 
 ### Added (distribution)
 

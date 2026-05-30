@@ -32,9 +32,10 @@ type envRow struct {
 // value), while a secret carries only its source declaration (${env:…}/${sops:…}) — never a
 // resolved value, which this view never reads.
 type desiredEnvRow struct {
-	name    string
-	display string // plain value, or a secret's source declaration
-	secret  bool
+	name     string
+	display  string // plain value, or a secret's source declaration
+	secret   bool
+	modified bool // carries an unsaved staged edit
 }
 
 // detail is the right-hand pane: the fields, the live env table (services only), and the
@@ -49,6 +50,11 @@ type detail struct {
 	desiredEnvs []desiredEnvRow
 	desiredNote string
 	revealed    bool
+
+	// env and name are the logical coordinates of an application detail, used to match the
+	// desired config and to target an edit; envCursor selects the desired env row to edit.
+	env, name string
+	envCursor int
 }
 
 // hasEnvs reports whether the detail carries a live environment-variable table (services
@@ -103,6 +109,21 @@ func desiredEnvRows(entries []resource.EnvVarEntry) []desiredEnvRow {
 			continue
 		}
 		rows = append(rows, desiredEnvRow{name: e.Name, display: e.Value})
+	}
+	return rows
+}
+
+// desiredEnvRowsWithEdits projects desired env vars overlaid with their staged edits. A staged
+// row shows its new value (the source declaration for a secret) and is flagged modified, so a
+// secret's resolved value is still never read.
+func desiredEnvRowsWithEdits(entries []resource.EnvVarEntry, edits map[string]stagedEnv) []desiredEnvRow {
+	rows := desiredEnvRows(entries)
+	for i := range rows {
+		if e, ok := edits[rows[i].name]; ok {
+			rows[i].display = e.value
+			rows[i].secret = e.secret
+			rows[i].modified = true
+		}
 	}
 	return rows
 }

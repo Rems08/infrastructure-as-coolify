@@ -2,8 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Rems08/infrastructure-as-coolify/internal/resource"
@@ -40,6 +42,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case svcDetailMsg:
 		m.detail = ptr(serviceDetail(msg.name, msg.envs))
 		return m, nil
+	case savedMsg:
+		return m.applySaved(msg)
 	case LogMsg:
 		m.logs = append(m.logs, msg)
 		return m, nil
@@ -49,14 +53,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showLogs = false
 		return m, nil
 	case mutationDoneMsg:
-		if msg.err != nil {
-			m.err = msg.err
-			m.status = ""
-		} else {
-			m.err = nil
-			m.status = fmt.Sprintf("%s requested for %s", msg.action, msg.name)
-		}
-		return m, nil
+		return m.applyMutationDone(msg)
 	case errMsg:
 		m.err = msg.err
 		m.loading = false
@@ -67,17 +64,54 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// applySaved records the outcome of a write-back. A failure surfaces an error and keeps the
+// staging so the user can retry; a success purges the saved application's edits and refreshes
+// the display.
+func (m Model) applySaved(msg savedMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		m.err = msg.err
+		m.status = ""
+		return m, nil
+	}
+	delete(m.staged, msg.target)
+	m.err = nil
+	m.status = "saved " + msg.path
+	m.refreshDesired(m.detail)
+	return m, nil
+}
+
+// applyMutationDone records the outcome of a lifecycle action in the status or error line.
+func (m Model) applyMutationDone(msg mutationDoneMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		m.err = msg.err
+		m.status = ""
+		return m, nil
+	}
+	m.err = nil
+	m.status = fmt.Sprintf("%s requested for %s", msg.action, msg.name)
+	return m, nil
+}
+
 // handleKey applies a key press. Navigation mutates the tree in place; opening a leaf
 // returns a command that fetches its detail.
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// A live confirmation captures every key so an accidental press can neither escape it
-	// (e.g. q quitting mid-prompt) nor trigger another action.
+	// A live confirmation or edit captures every key so an accidental press can neither escape
+	// it (e.g. q quitting mid-prompt) nor trigger another action.
 	if m.confirm != nil {
 		return m.handleConfirm(msg)
 	}
+	if m.editing != nil {
+		return m.handleEdit(msg)
+	}
 	switch {
 	case key.Matches(msg, m.keys.Quit):
-		return m, tea.Quit
+		return m.handleQuit()
+	case key.Matches(msg, m.keys.Edit):
+		return m.startEdit()
+	case key.Matches(msg, m.keys.Save):
+		return m.startSave()
+	case key.Matches(msg, m.keys.Discard):
+		return m.discardEdits()
 	case key.Matches(msg, m.keys.Restart):
 		return m.startLifecycle(actionRestart)
 	case key.Matches(msg, m.keys.Stop):
@@ -90,17 +124,36 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showLogs = !m.showLogs
 		return m, nil
 	case key.Matches(msg, m.keys.Reveal):
-		if m.detail != nil && m.detail.hasMaskableValues() {
-			m.detail.revealed = !m.detail.revealed
-		}
-		return m, nil
+		return m.toggleReveal()
 	}
 	return m.handleNav(msg)
 }
 
-// handleNav applies the tree-navigation keys (up/down/back/open). Navigation mutates the
-// tree in place; opening a leaf returns a command that fetches its detail.
+// handleQuit quits immediately when clean; with unsaved edits it arms a confirmation instead,
+// so a stray q cannot discard pending write-backs.
+func (m Model) handleQuit() (tea.Model, tea.Cmd) {
+	if m.hasPendingEdits() {
+		m.confirm = &confirmState{prompt: "uncommitted changes — quit anyway? [y/N]", onConfirm: tea.Quit}
+		return m, nil
+	}
+	return m, tea.Quit
+}
+
+// toggleReveal flips the value mask when the detail has maskable values; otherwise a no-op.
+func (m Model) toggleReveal() (tea.Model, tea.Cmd) {
+	if m.detail != nil && m.detail.hasMaskableValues() {
+		m.detail.revealed = !m.detail.revealed
+	}
+	return m, nil
+}
+
+// handleNav applies the tree-navigation keys (up/down/back/open). When an application detail
+// with desired env rows is open, focus moves into that list instead, so up/down select the
+// row to edit and back returns focus to the tree.
 func (m Model) handleNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.detail != nil && m.detail.hasDesiredEnvs() {
+		return m.handleDesiredNav(msg)
+	}
 	switch {
 	case key.Matches(msg, m.keys.Up):
 		m.tree.up()
@@ -114,6 +167,113 @@ func (m Model) handleNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, loadDetailCmd(m.ctx, m.client, leaf)
 		}
 	}
+	return m, nil
+}
+
+// handleDesiredNav moves the cursor over an application's desired env rows, or returns focus
+// to the tree (back). Up/down clamp at the ends; open is a no-op (e edits the cursored row).
+func (m Model) handleDesiredNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Up):
+		if m.detail.envCursor > 0 {
+			m.detail.envCursor--
+		}
+	case key.Matches(msg, m.keys.Down):
+		if m.detail.envCursor < len(m.detail.desiredEnvs)-1 {
+			m.detail.envCursor++
+		}
+	case key.Matches(msg, m.keys.Back):
+		m.detail = nil
+	}
+	return m, nil
+}
+
+// startEdit opens the textinput on the cursored desired env row, pre-filled with the plain
+// value or, for a secret, its source declaration. It is a no-op unless an application detail
+// with desired env rows is open.
+func (m Model) startEdit() (tea.Model, tea.Cmd) {
+	if m.detail == nil || !m.detail.hasDesiredEnvs() {
+		return m, nil
+	}
+	row := m.detail.desiredEnvs[m.detail.envCursor]
+	ti := textinput.New()
+	ti.SetValue(row.display)
+	ti.CursorEnd()
+	ti.Focus()
+	m.editing = &editState{
+		input:  ti,
+		target: appKey{env: m.detail.env, name: m.detail.name},
+		name:   row.name,
+		secret: row.secret,
+	}
+	return m, textinput.Blink
+}
+
+// handleEdit consumes a key while an edit is active. Enter validates and stages the value
+// (keeping the input open on a validation error); esc cancels; every other key is forwarded
+// to the textinput so it stays modal.
+func (m Model) handleEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		val := strings.TrimSpace(m.editing.input.Value())
+		if err := validateEdit(m.editing.secret, val); err != nil {
+			m.err = err
+			return m, nil
+		}
+		m.stageEdit(m.editing.target, m.editing.name, val, m.editing.secret)
+		m.editing = nil
+		m.err = nil
+		m.refreshDesired(m.detail)
+		return m, nil
+	case "esc":
+		m.editing = nil
+		m.err = nil
+		return m, nil
+	default:
+		var cmd tea.Cmd
+		m.editing.input, cmd = m.editing.input.Update(msg)
+		return m, cmd
+	}
+}
+
+// startSave writes the viewed application's staged edits back to its manifest. It builds the
+// patched application inline (pure, no I/O) and defers the disk write to a command, so the
+// update loop never blocks. A validation failure surfaces an error and keeps the staging.
+func (m Model) startSave() (tea.Model, tea.Cmd) {
+	if m.detail == nil || !m.detail.hasDesiredEnvs() {
+		return m, nil
+	}
+	target := appKey{env: m.detail.env, name: m.detail.name}
+	edits := m.staged[target]
+	if len(edits) == 0 {
+		m.status = "no changes to save"
+		return m, nil
+	}
+	f, ok := m.desiredFor(target.env, target.name)
+	if !ok {
+		return m, nil
+	}
+	patched, err := patchApplication(f.Application, edits)
+	if err != nil {
+		m.err = err
+		return m, nil
+	}
+	return m, saveCmd(m.ctx, m.auditor, f.Path, patched, target)
+}
+
+// discardEdits drops the viewed application's staged edits and restores the displayed rows to
+// the on-disk config. It is a no-op when no application detail with desired rows is open.
+func (m Model) discardEdits() (tea.Model, tea.Cmd) {
+	if m.detail == nil || !m.detail.hasDesiredEnvs() {
+		return m, nil
+	}
+	target := appKey{env: m.detail.env, name: m.detail.name}
+	if len(m.staged[target]) == 0 {
+		return m, nil
+	}
+	delete(m.staged, target)
+	m.refreshDesired(m.detail)
+	m.status = "discarded edits"
 	return m, nil
 }
 

@@ -118,6 +118,12 @@ func (m Model) renderDetail() string {
 		b.WriteString(sec)
 		b.WriteByte('\n')
 	}
+	if m.editing != nil {
+		fmt.Fprintf(&b, "\nedit %s: %s\n", m.editing.name, m.editing.input.View())
+		if m.editing.secret {
+			b.WriteString(dimStyle.Render("keep a ${env:NAME} or ${sops:path} reference"))
+		}
+	}
 	return strings.TrimRight(b.String(), "\n")
 }
 
@@ -135,18 +141,33 @@ func renderDesiredSection(d *detail) string {
 		b.WriteString(dimStyle.Render(d.desiredNote))
 		return b.String()
 	}
-	for _, e := range d.desiredEnvs {
-		if e.secret {
-			fmt.Fprintf(&b, "%-22s 🔒 %s\n", e.name, d.renderDesiredValue(e))
-		} else {
-			fmt.Fprintf(&b, "%-22s %s\n", e.name, d.renderDesiredValue(e))
+	dirty := false
+	for i, e := range d.desiredEnvs {
+		cursor := "  "
+		if i == d.envCursor {
+			cursor = cursorStyle.Render("> ")
 		}
+		marker := ""
+		if e.modified {
+			marker = updStyle.Render(" *")
+			dirty = true
+		}
+		lock := ""
+		if e.secret {
+			lock = "🔒 "
+		}
+		fmt.Fprintf(&b, "%s%-22s %s%s%s\n", cursor, e.name, lock, d.renderDesiredValue(e), marker)
 	}
+	if dirty {
+		b.WriteString(updStyle.Render("● unsaved changes (s save · d discard)"))
+		b.WriteByte('\n')
+	}
+	b.WriteString(dimStyle.Render("(e edit)"))
 	if d.hasMaskableValues() {
 		if d.revealed {
-			b.WriteString(revealedStyle.Render("⚠ values revealed (r to hide)"))
+			b.WriteString(revealedStyle.Render("  ⚠ values revealed (r to hide)"))
 		} else {
-			b.WriteString(dimStyle.Render("(r to reveal)"))
+			b.WriteString(dimStyle.Render("  (r to reveal)"))
 		}
 	}
 	return strings.TrimRight(b.String(), "\n")

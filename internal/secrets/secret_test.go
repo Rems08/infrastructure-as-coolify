@@ -20,6 +20,47 @@ func TestValueEquals(t *testing.T) {
 	}
 }
 
+func TestNewReference(t *testing.T) {
+	tests := []struct {
+		name       string
+		raw        string
+		wantOrigin string
+		wantErr    bool
+	}{
+		{name: "env", raw: "${env:DATABASE_URL}", wantOrigin: "${env:DATABASE_URL}"},
+		{name: "sops", raw: "${sops:stripe.key}", wantOrigin: "${sops:stripe.key}"},
+		{name: "literal rejected", raw: "postgres://user:pass@host", wantErr: true},
+		{name: "empty rejected", raw: "", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, err := NewReference(tt.raw)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("NewReference(%q) = nil error, want error", tt.raw)
+				}
+				if strings.Contains(err.Error(), tt.raw) && tt.raw != "" {
+					t.Errorf("error leaked the raw literal: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("NewReference(%q): %v", tt.raw, err)
+			}
+			if s.Origin() != tt.wantOrigin {
+				t.Errorf("Origin = %q, want %q", s.Origin(), tt.wantOrigin)
+			}
+			if s.IsZero() {
+				t.Error("a parsed reference must not be the zero Secret")
+			}
+			// A reference carries no resolved value: MarshalYAML emits the origin only.
+			if s.Reveal() != "" {
+				t.Error("a reference must hold no value")
+			}
+		})
+	}
+}
+
 func TestUnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name       string

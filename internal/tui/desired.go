@@ -54,13 +54,15 @@ func (m Model) desiredFor(env, name string) (config.ApplicationFile, bool) {
 	return f, ok
 }
 
-// attachDesired fills in an application detail's desired env-var section: the matched
-// config's env vars, or a note when no desired Application matches the selection.
+// attachDesired fills in an application detail's desired env-var section: the matched config's
+// env vars (overlaid with any staged edits), or a note when no desired Application matches the
+// selection. It records the detail's logical coordinates so a later edit can target them.
 func (m Model) attachDesired(d *detail, env, name string) {
+	d.env, d.name = env, name
 	f, ok := m.desiredFor(env, name)
 	if !ok {
 		d.desiredNote = "no desired config for this application"
 		return
 	}
-	d.desiredEnvs = desiredEnvRows(f.Application.Spec.EnvVars)
+	d.desiredEnvs = desiredEnvRowsWithEdits(f.Application.Spec.EnvVars, m.staged[appKey{env: env, name: name}])
 }

@@ -63,6 +63,26 @@ func NewFromSOPS(decrypted, path string) Secret {
 	return Secret{value: decrypted, source: SourceSOPS, origin: "${sops:" + path + "}"}
 }
 
+// NewReference builds a Secret from a source declaration (${env:NAME} or ${sops:path})
+// without resolving its value. It is the write-back companion to UnmarshalYAML: a reference
+// being edited and serialised back needs only its origin (MarshalYAML emits the origin, never
+// a value), so no env lookup or SOPS decryption happens here — the env var need not be set
+// where the edit is made, only where the manifest is later applied. A literal (anything not
+// matching the two reference forms) is rejected, so a secret can never be downgraded to a
+// hardcoded value.
+func NewReference(raw string) (Secret, error) {
+	if name, ok := envRef(raw); ok {
+		return Secret{source: SourceEnv, origin: "${env:" + name + "}"}, nil
+	}
+	if path, ok := sopsRef(raw); ok {
+		return Secret{source: SourceSOPS, origin: "${sops:" + path + "}", pending: true}, nil
+	}
+	return Secret{}, fmt.Errorf(
+		"secrets: literal value forbidden, use ${env:NAME} or ${sops:path}, got: %s",
+		redactPreview(raw),
+	)
+}
+
 // NewRemote builds an opaque Secret from a runtime value read back from the API. It has
 // no source declaration (Origin is empty), so it renders as [REDACTED] everywhere. An
 // empty value yields the unset zero Secret, so a null/absent API field stays IsZero.

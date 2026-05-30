@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -100,6 +101,104 @@ func TestIntegration_DesiredEnvInDetail(t *testing.T) {
 	m, _ = step(t, m, keyRunes('r'))
 	if !strings.Contains(m.View(), "production") {
 		t.Errorf("plain value not revealed after r:\n%s", m.View())
+	}
+}
+
+// TestQuit_GuardsWhenDirty arms a confirmation instead of quitting when edits are pending, and
+// quits only after the prompt is confirmed.
+func TestQuit_GuardsWhenDirty(t *testing.T) {
+	m := openWebDetail(t)
+	m, _ = step(t, m, keyRunes('e'))
+	m.editing.input.SetValue("devmode")
+	m, _ = step(t, m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	m, cmd := step(t, m, keyRunes('q'))
+	if cmd != nil {
+		t.Fatal("q quit outright despite pending edits")
+	}
+	if m.confirm == nil {
+		t.Fatal("q did not arm the unsaved-changes confirmation")
+	}
+	m, cmd = step(t, m, keyRunes('y'))
+	if cmd == nil {
+		t.Fatal("confirming the quit returned no command")
+	}
+	if _, ok := cmd().(tea.QuitMsg); !ok {
+		t.Fatalf("confirm produced %T, want tea.QuitMsg", cmd())
+	}
+}
+
+// TestQuit_ImmediateWhenClean quits without a prompt when there are no pending edits.
+func TestQuit_ImmediateWhenClean(t *testing.T) {
+	m := openWebDetail(t)
+	_, cmd := step(t, m, keyRunes('q'))
+	if cmd == nil {
+		t.Fatal("clean quit returned no command")
+	}
+	if _, ok := cmd().(tea.QuitMsg); !ok {
+		t.Fatalf("clean quit produced %T, want tea.QuitMsg", cmd())
+	}
+}
+
+// TestIntegration_EditSaveWriteBack drives a full edit-and-save session on a temp manifest:
+// resolve, load the desired index, open the web application, type a new value into the focused
+// env row, save it to disk, then edit again and quit through the unsaved-changes guard.
+func TestIntegration_EditSaveWriteBack(t *testing.T) {
+	t.Setenv("WEB_DB_URL", "postgres://example")
+	dir := writeTempManifest(t)
+	fc := newFakeClient()
+	rec := &fakeRecorder{}
+	m := NewModel(context.Background(), fc, fc, WithConfigPath(dir), WithAuditor(rec))
+
+	m = selectApp(t, m)
+	m, _ = step(t, m, loadDesiredCmd(dir)()) // populate the desired index
+
+	m, cmd := step(t, m, tea.KeyMsg{Type: tea.KeyEnter}) // open web
+	m, _ = step(t, m, cmd())                             // appDetailMsg → attach desired
+	if m.detail == nil || !m.detail.hasDesiredEnvs() {
+		t.Fatal("web detail not opened with desired env rows")
+	}
+
+	// Edit the focused (plain) row by typing, proving the textinput captures keys.
+	m, _ = step(t, m, keyRunes('e'))
+	m.editing.input.SetValue("")
+	for _, r := range "staging-mode" {
+		m, _ = step(t, m, keyRunes(r))
+	}
+	m, _ = step(t, m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	// Save to disk.
+	m, cmd = step(t, m, keyRunes('s'))
+	if cmd == nil {
+		t.Fatal("save returned no command")
+	}
+	m, _ = step(t, m, cmd()) // savedMsg
+
+	out, err := os.ReadFile(filepath.Join(dir, "web.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), "staging-mode") {
+		t.Errorf("typed value not written back:\n%s", out)
+	}
+	if strings.Contains(string(out), "postgres://example") {
+		t.Fatalf("resolved secret value leaked to disk:\n%s", out)
+	}
+	if m.hasPendingEdits() {
+		t.Error("staging not cleared after save")
+	}
+
+	// Edit again, then quit through the guard.
+	m, _ = step(t, m, keyRunes('e'))
+	m.editing.input.SetValue("other")
+	m, _ = step(t, m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = step(t, m, keyRunes('q'))
+	if m.confirm == nil {
+		t.Fatal("quit did not guard pending edits")
+	}
+	_, qcmd := step(t, m, keyRunes('y'))
+	if _, ok := qcmd().(tea.QuitMsg); !ok {
+		t.Fatal("guarded quit did not exit on confirm")
 	}
 }
 

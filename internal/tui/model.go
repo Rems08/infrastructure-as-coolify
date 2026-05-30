@@ -25,10 +25,15 @@ type Model struct {
 	tree      tree
 	detail    *detail
 	confirm   *confirmState
+	editing   *editState // active env-var edit; while set, every key routes to the textinput.
 	drift     *driftView
 	logs      []LogMsg
 	showLogs  bool
 	showDrift bool
+
+	// staged holds unsaved env-var edits keyed by application then var name. It is written by
+	// s and cleared on save or discard; hasPendingEdits drives the quit guard.
+	staged map[appKey]map[string]stagedEnv
 
 	width, height int
 	loading       bool
@@ -64,6 +69,7 @@ func NewModel(ctx context.Context, explorer explorerClient, mutator mutatorClien
 		keys:    defaultKeys(),
 		help:    help.New(),
 		loading: true,
+		staged:  map[appKey]map[string]stagedEnv{},
 	}
 	for _, opt := range opts {
 		opt(&m)

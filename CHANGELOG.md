@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed (lenient load)
+
+- Loading a config no longer requires the referenced `${env:…}` variables to be set.
+  `validate`, `plan` and `explore` keep every secret and visible `${env:…}` reference
+  unresolved — a typed secret carries only its `${env:…}` origin, never a value — so these
+  read-only flows work without the secret environment present. The values are bound at one
+  explicit point, `apply`, which resolves them and fails with a clear, resource-named error
+  if a referenced variable is unset (rather than pushing an empty value); `destroy` never
+  resolves them. Pending `${sops:…}` secrets are still decrypted at load, since SOPS
+  resolution needs the manifest directory. As a consequence `validate` (including `--strict`)
+  no longer reports an unset secret environment variable — that check now belongs to `apply`.
+
+### Fixed (explore)
+
+- A project or environment node no longer leaves the detail pane stuck on "(loading…)":
+  containers expand instead of attempting a detail fetch they have no endpoint for, and a
+  stale placeholder is cleared on a load error.
+
 ### Added (application mutations & write-back)
 
 - Low-level Coolify client methods for applications: `start`, `stop` and `restart` — the

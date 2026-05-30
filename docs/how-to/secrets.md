@@ -27,6 +27,19 @@ env_vars:
     value_secret: "${sops:stripe.key}"      # secret, SOPS-decrypted, REDACTED
 ```
 
+## When `${env:…}` references resolve
+
+Loading is lenient: `validate`, `plan` and `explore` keep every `${env:…}` reference (visible
+values and `value_secret` alike) unresolved — a secret carries only its origin — so these
+read-only commands work even when the secret environment is not set. The values are bound at
+exactly one place: `apply`, which resolves them just before pushing. If a referenced variable
+is unset, `apply` fails with a clear, resource-named error rather than pushing an empty value;
+`destroy` never resolves them. `${sops:…}` references are the exception — they are decrypted at
+load, since that needs the manifest directory.
+
+Because of this, `validate` (including `--strict`) checks structure and schema only and no
+longer reports an unset secret environment variable; run `apply` to surface a missing one.
+
 ## SOPS + age secrets at rest
 
 A `${sops:path}` reference is read from a `secrets.enc.yaml` **colocated with the manifest**

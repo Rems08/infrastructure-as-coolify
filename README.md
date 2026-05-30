@@ -331,6 +331,32 @@ safe to track.
 `iac-coolify` never reveals secret values, by design. To inspect one, go to the source —
 e.g. `printenv DATABASE_URL`. Secrets stay scoped to the tool that owns them (your shell).
 
+## Exploring interactively
+
+`iac-coolify explore` (alias `tui`) opens a read-only terminal browser over the live
+Coolify instance — walk the project → environment → resource tree on the left and inspect
+the selected resource on the right. It never mutates anything.
+
+```bash
+export COOLIFY_API_URL=https://coolify.example.com
+export COOLIFY_API_TOKEN=...        # both required; explore has no offline mode
+iac-coolify explore
+```
+
+| Key        | Action                                            |
+|------------|---------------------------------------------------|
+| `↑`/`↓` `k`/`j` | move the cursor                              |
+| `↵`        | expand/collapse a container, or open a resource   |
+| `esc`/`backspace` | collapse, or jump to the parent            |
+| `r`        | reveal/hide a service's environment-variable values |
+| `L`        | toggle the log pane                               |
+| `q`/`ctrl+c` | quit                                            |
+
+A service shows its environment variables as a table; every value is **masked by default**
+and only shown after you press `r`. Applications and databases show their structural fields
+(no environment-variable table). `explore` requires an interactive terminal — in a pipe or
+CI it exits with an error rather than opening a UI.
+
 ## CI integration
 
 Pass `COOLIFY_API_TOKEN` (and any Cloudflare Access service-token headers) as **masked**

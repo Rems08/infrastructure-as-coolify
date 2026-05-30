@@ -12,6 +12,7 @@
 - [Manage databases](how-to/manage-databases.md)
 - [Interpolate environment variables](how-to/environment-interpolation.md)
 - [Manage secrets](how-to/secrets.md)
+- [Explore live state interactively](how-to/explore-interactively.md)
 - [Run in CI](how-to/ci-integration.md)
 
 # Reference

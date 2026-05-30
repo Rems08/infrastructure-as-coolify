@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added (import)
+
+- New `iac-coolify import [dir]` command reverse-engineers a live Coolify instance into local
+  YAML manifests. It enumerates resources per server (the only path that reveals which server
+  hosts each one), maps applications and databases back to the resource schema, and scaffolds
+  a `coolify.yaml` root plus an `environments/<env>/{applications,databases}/` tree. Runs
+  non-interactively. Flags: `--default-network` (the network the API does not expose, default
+  `coolify`), `--env` (filter to one or more environments), `--force` (overwrite existing
+  manifests instead of refusing). Secrets are never written: each environment variable becomes
+  a `${env:KEY}` reference and each database password a `${env:NAME_PASSWORD}` reference, and
+  the import report lists the keys to populate. Services are not imported (the API does not
+  expose enough to rebuild them) and git-based applications are written partially (the
+  repository URL is not exposed); both are reported rather than silently dropped. A new
+  `config.WriteDatabase` marshaller mirrors `WriteApplication`, refusing to serialise a
+  password that carries no `${env:}`/`${sops:}` declaration.
+
 ### Fixed (resolver)
 
 - `explore`, `plan` and `apply` now resolve applications and services against a live Coolify

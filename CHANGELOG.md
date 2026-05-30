@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added (distribution)
+
+- A composite GitHub Action at the repository root: `uses: Rems08/infrastructure-as-coolify@v1`
+  wraps the CLI (`command: plan|apply|destroy|validate`, `path`, `target`, `env`, `api-token`)
+  as a Linux Docker action running the published container image. A `action-test` workflow
+  self-tests it by validating `examples/minimal` on every push and pull request.
+- A reusable GitLab CI template, `.gitlab/templates/iac-coolify.yml`, exposing extendable
+  `.iac-coolify-plan`, `.iac-coolify-apply` (default branch and tags) and `.iac-coolify-destroy`
+  (manual) jobs. The published image is distroless, so the jobs fetch the static release binary
+  and verify its checksum before running it.
+- An mdBook documentation site organised by the [Diátaxis](https://diataxis.fr/) framework
+  (tutorials, how-to guides, reference, explanation), integrating the generated
+  `docs/reference/` as its reference section, deployed to GitHub Pages by a `docs` workflow.
+- README CI-integration examples for the Action and the GitLab template, plus a doc-site badge.
+
 ## [0.1.0-rc.2] - 2026-05-29
 
 This is the first tagged release: signed, multi-arch binaries and container image with

@@ -1,0 +1,15 @@
+[book]
+title = "iac-coolify"
+authors = ["Rems08"]
+description = "Declarative Infrastructure as Code for Coolify."
+src = "docs"
+language = "en"
+
+[output.html]
+git-repository-url = "https://github.com/Rems08/infrastructure-as-coolify"
+edit-url-template = "https://github.com/Rems08/infrastructure-as-coolify/edit/main/docs/{path}"
+default-theme = "navy"
+preferred-dark-theme = "navy"
+
+[output.html.search]
+enable = true

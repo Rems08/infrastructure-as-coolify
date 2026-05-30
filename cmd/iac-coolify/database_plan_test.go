@@ -68,7 +68,7 @@ func coolifyDBMux(t *testing.T) *httptest.Server {
 		`"redis_password":"` + redisSecret + `","status":"running:healthy"}`
 	bodies := map[string]string{
 		"/api/v1/projects":                   `[{"id":1,"uuid":"p1","name":"beenaire"}]`,
-		"/api/v1/projects/p1/environments":   `[{"id":10,"name":"staging","project_id":1},{"id":11,"name":"production","project_id":1}]`,
+		"/api/v1/projects/p1/environments":   `[{"id":10,"name":"staging"},{"id":11,"name":"production"}]`,
 		"/api/v1/servers":                    `[{"uuid":"srv-1","name":"localhost"}]`,
 		"/api/v1/applications":               `[]`,
 		"/api/v1/services":                   `[]`,

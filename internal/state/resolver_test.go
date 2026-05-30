@@ -65,11 +65,11 @@ func TestResolveUUIDsFromHTTPTest(t *testing.T) {
 			{"id":2,"uuid":"proj-lab","name":"labs"}
 		]`,
 		"/api/v1/projects/proj-bee/environments": `[
-			{"id":10,"name":"staging","project_id":1},
-			{"id":11,"name":"production","project_id":1}
+			{"id":10,"name":"staging"},
+			{"id":11,"name":"production"}
 		]`,
 		"/api/v1/projects/proj-lab/environments": `[
-			{"id":20,"name":"staging","project_id":2}
+			{"id":20,"name":"staging"}
 		]`,
 		"/api/v1/servers": `[
 			{"uuid":"srv-1","name":"localhost"},
@@ -145,6 +145,102 @@ func TestResolveUUIDsFromHTTPTest(t *testing.T) {
 	// missing: a key that was never declared.
 	if _, ok := m.Lookup(key("beenaire", "staging", "ghost")); ok {
 		t.Error("ghost key must not resolve")
+	}
+}
+
+// TestResolve_AppsAndServicesResolvedWithoutProjectID reproduces the live API shape:
+// GET /projects/{uuid}/environments returns {id, uuid, name} with no project_id. The
+// resolver must still scope every application and service under its project (derived while
+// enumerating environments), across more than one project. On code that derived the project
+// from env.project_id this fails — every child is dropped and the map holds only the
+// project and environment keys.
+func TestResolve_AppsAndServicesResolvedWithoutProjectID(t *testing.T) {
+	bodies := map[string]string{
+		"/api/v1/projects": `[
+			{"id":1,"uuid":"proj-bee","name":"beenaire"},
+			{"id":2,"uuid":"proj-lab","name":"labs"}
+		]`,
+		"/api/v1/projects/proj-bee/environments": `[
+			{"id":1,"name":"production"},
+			{"id":4,"name":"staging"}
+		]`,
+		"/api/v1/projects/proj-lab/environments": `[
+			{"id":7,"name":"staging"}
+		]`,
+		"/api/v1/servers": `[]`,
+		"/api/v1/applications": `[
+			{"uuid":"u-bo-prod","name":"back-office","environment_id":1},
+			{"uuid":"u-bo-stg","name":"back-office","environment_id":4},
+			{"uuid":"u-lab","name":"sandbox","environment_id":7}
+		]`,
+		"/api/v1/services": `[
+			{"uuid":"u-obs","name":"observability","environment_id":1}
+		]`,
+	}
+	srv := serve(t, bodies, nil)
+	m, err := state.Resolve(context.Background(), newClient(t, srv.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	svcKey := func(project, env, name string) state.ResourceKey {
+		return state.ResourceKey{Project: project, Environment: env, Kind: resource.KindService, Name: name}
+	}
+	wantApps := map[state.ResourceKey]string{
+		key("beenaire", "production", "back-office"): "u-bo-prod",
+		key("beenaire", "staging", "back-office"):    "u-bo-stg", // same name, sibling env
+		key("labs", "staging", "sandbox"):            "u-lab",    // a second project, distinct env id
+	}
+	for k, want := range wantApps {
+		if got, ok := m.Lookup(k); !ok || got != want {
+			t.Errorf("Lookup(%v) = %q,%v want %q (app dropped — project not derived from enumeration)", k, got, ok, want)
+		}
+	}
+	if got, ok := m.Lookup(svcKey("beenaire", "production", "observability")); !ok || got != "u-obs" {
+		t.Errorf("service observability = %q,%v want u-obs", got, ok)
+	}
+}
+
+// TestResolve_WarnsAndCountsUnmappedChildren asserts an application whose environment_id was
+// never enumerated is logged and counted, not dropped in silence.
+func TestResolve_WarnsAndCountsUnmappedChildren(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	bodies := map[string]string{
+		"/api/v1/projects":                       `[{"id":1,"uuid":"proj-bee","name":"beenaire"}]`,
+		"/api/v1/projects/proj-bee/environments": `[{"id":10,"name":"staging"}]`,
+		"/api/v1/servers":                        `[]`,
+		"/api/v1/applications": `[
+			{"uuid":"u-ok","name":"web","environment_id":10},
+			{"uuid":"u-orphan","name":"ghost","environment_id":999}
+		]`,
+		"/api/v1/services": `[]`,
+	}
+	srv := serve(t, bodies, nil)
+	m, err := state.Resolve(context.Background(), newClient(t, srv.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := m.Lookup(key("beenaire", "staging", "ghost")); ok {
+		t.Error("app with unknown environment_id must not be keyed")
+	}
+
+	rec := findLogRecord(t, buf.Bytes(), "resolved applications and services")
+	if got := rec["resolver.children.resolved"]; got != float64(1) {
+		t.Errorf("resolved count = %v, want 1", got)
+	}
+	if got := rec["resolver.children.dropped"]; got != float64(1) {
+		t.Errorf("dropped count = %v, want 1", got)
+	}
+	warn := findLogRecord(t, buf.Bytes(), "resolve: resource skipped, environment_id not found")
+	if got := warn["resolver.child.name"]; got != "ghost" {
+		t.Errorf("warn names %v, want ghost", got)
+	}
+	if got := warn["resolver.child.environment_id"]; got != float64(999) {
+		t.Errorf("warn environment_id = %v, want 999", got)
 	}
 }
 

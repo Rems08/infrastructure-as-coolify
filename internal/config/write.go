@@ -8,6 +8,7 @@ import (
 	"github.com/goccy/go-yaml"
 
 	"github.com/Rems08/infrastructure-as-coolify/internal/resource"
+	"github.com/Rems08/infrastructure-as-coolify/internal/secrets"
 )
 
 // WriteApplication serialises app back to a YAML manifest at path, preserving the full
@@ -27,6 +28,22 @@ func WriteApplication(path string, app resource.Application) error {
 	return atomicWrite(path, data)
 }
 
+// WriteDatabase serialises db back to a YAML manifest at path, mirroring WriteApplication:
+// the password Secret is emitted as its source declaration (${env:NAME} / ${sops:path}) by
+// secrets.Secret.MarshalYAML, never as a resolved value, and a password that carries no such
+// declaration is refused before any write (see guardWritableDatabase). The file is written
+// atomically via the same temp-file-then-rename used by WriteApplication.
+func WriteDatabase(path string, db resource.Database) error {
+	if err := guardWritableDatabase(db); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	data, err := yaml.Marshal(db)
+	if err != nil {
+		return fmt.Errorf("marshal database %q: %w", db.Metadata.Name, err)
+	}
+	return atomicWrite(path, data)
+}
+
 // guardWritableSecrets refuses to serialise a secret with no source declaration. A secret
 // sourced from ${env:} or ${sops:} carries an origin that re-emits safely; a secret read
 // back from the API (or otherwise forged) has none, and writing it would either drop the
@@ -34,12 +51,25 @@ func WriteApplication(path string, app resource.Application) error {
 func guardWritableSecrets(app resource.Application) error {
 	for i := range app.Spec.EnvVars {
 		e := app.Spec.EnvVars[i]
-		if !e.ValueSecret.IsZero() && e.ValueSecret.Origin() == "" {
-			return fmt.Errorf(
-				"env_var %q: cannot serialise a secret with no ${env:}/${sops:} declaration",
-				e.Name,
-			)
+		if err := guardSecret(fmt.Sprintf("env_var %q", e.Name), e.ValueSecret); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+// guardWritableDatabase refuses to serialise a database password with no source declaration,
+// applying the same rule as guardWritableSecrets to the single password field.
+func guardWritableDatabase(db resource.Database) error {
+	return guardSecret("password", db.Spec.Password)
+}
+
+// guardSecret reports an error when s holds a value but no ${env:}/${sops:} declaration:
+// writing it would either drop the reference or risk leaking the live value. An unset secret
+// and a reference-only secret both pass.
+func guardSecret(field string, s secrets.Secret) error {
+	if !s.IsZero() && s.Origin() == "" {
+		return fmt.Errorf("%s: cannot serialise a secret with no ${env:}/${sops:} declaration", field)
 	}
 	return nil
 }

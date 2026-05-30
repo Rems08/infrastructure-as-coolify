@@ -104,6 +104,92 @@ func TestWriteApplicationRefusesSecretWithoutOrigin(t *testing.T) {
 	}
 }
 
+func TestWriteDatabaseRoundTrip(t *testing.T) {
+	pw, err := secrets.NewReference("${env:PG_RESTAURANT_API_STAGING_PASSWORD}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := resource.Database{
+		APIVersion: resource.APIVersion,
+		Kind:       resource.KindDatabase,
+		Metadata:   resource.DatabaseMeta{Name: "pg-restaurant-api-staging", Project: "beenaire", Environment: "staging"},
+		Spec: resource.DatabaseSpec{
+			Engine:      "postgresql",
+			Image:       "postgres:18-alpine",
+			Destination: resource.DestinationRef{Server: "localhost", Network: "coolify"},
+			Password:    pw,
+		},
+	}
+	out := filepath.Join(t.TempDir(), "db.yaml")
+	if err = config.WriteDatabase(out, db); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	reloaded, err := config.LoadDatabase(out)
+	if err != nil {
+		t.Fatalf("reload written file: %v", err)
+	}
+	if vErr := reloaded.Validate(); vErr != nil {
+		t.Fatalf("written database does not validate: %v", vErr)
+	}
+	if !reflect.DeepEqual(db, reloaded) {
+		t.Errorf("round-trip changed the database:\n--- before ---\n%+v\n--- after ---\n%+v", db, reloaded)
+	}
+}
+
+func TestWriteDatabaseRefusesSecretWithoutOrigin(t *testing.T) {
+	db := resource.Database{
+		APIVersion: resource.APIVersion,
+		Kind:       resource.KindDatabase,
+		Metadata:   resource.DatabaseMeta{Name: "pg", Project: "p", Environment: "staging"},
+		Spec: resource.DatabaseSpec{
+			Engine:      "postgresql",
+			Destination: resource.DestinationRef{Server: "localhost", Network: "coolify"},
+			// A password read back from the live API carries no source declaration.
+			Password: secrets.NewRemote("leaked-from-api"),
+		},
+	}
+	out := filepath.Join(t.TempDir(), "db.yaml")
+	if err := config.WriteDatabase(out, db); err == nil {
+		t.Fatal("WriteDatabase must refuse a password with no ${env:}/${sops:} declaration")
+	}
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Error("WriteDatabase must not create a file when it refuses to serialise")
+	}
+}
+
+func TestWriteDatabaseDoesNotLeakSecretValue(t *testing.T) {
+	const leak = "super-secret-pg-password"
+	t.Setenv("PG_PASSWORD", leak)
+	pw, err := secrets.NewFromEnv("PG_PASSWORD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := resource.Database{
+		APIVersion: resource.APIVersion,
+		Kind:       resource.KindDatabase,
+		Metadata:   resource.DatabaseMeta{Name: "pg", Project: "p", Environment: "staging"},
+		Spec: resource.DatabaseSpec{
+			Engine:      "postgresql",
+			Destination: resource.DestinationRef{Server: "localhost", Network: "coolify"},
+			Password:    pw,
+		},
+	}
+	out := filepath.Join(t.TempDir(), "db.yaml")
+	if err = config.WriteDatabase(out, db); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(got), leak) {
+		t.Error("written manifest leaked the resolved password value")
+	}
+	if !strings.Contains(string(got), "${env:PG_PASSWORD}") {
+		t.Errorf("written manifest dropped the password source declaration:\n%s", got)
+	}
+}
+
 func TestWriteApplicationPreservesDisabledHealthCheck(t *testing.T) {
 	app := resource.Application{
 		APIVersion: resource.APIVersion,

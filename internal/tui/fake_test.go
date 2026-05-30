@@ -4,8 +4,21 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Rems08/infrastructure-as-coolify/internal/apply"
 	"github.com/Rems08/infrastructure-as-coolify/internal/coolify"
 )
+
+// fakeRecorder captures audit entries instead of writing a file, so lifecycle tracing is
+// asserted without touching disk.
+type fakeRecorder struct {
+	entries []apply.AuditEntry
+	err     error
+}
+
+func (r *fakeRecorder) Record(e apply.AuditEntry) error {
+	r.entries = append(r.entries, e)
+	return r.err
+}
 
 // fakeClient is an in-memory explorerClient for the browser tests: no HTTP, no httptest,
 // fully deterministic. A method whose corresponding *Err field is set returns that error,
@@ -22,6 +35,11 @@ type fakeClient struct {
 	svcEnvs  []coolify.ServiceEnvVar
 
 	listProjectsErr error
+	getAppErr       error
+
+	// lifecycle records every mutating call so tests assert what was (or was not) invoked.
+	lifecycle    []string
+	lifecycleErr error
 }
 
 func newFakeClient() *fakeClient {
@@ -71,10 +89,30 @@ func (f *fakeClient) GetServerResources(_ context.Context, serverUUID string) ([
 }
 
 func (f *fakeClient) GetApplication(_ context.Context, uuid string) (coolify.Application, error) {
+	if f.getAppErr != nil {
+		return coolify.Application{}, f.getAppErr
+	}
 	if uuid != f.app.UUID {
 		return coolify.Application{}, fmt.Errorf("no application %q", uuid)
 	}
 	return f.app, nil
+}
+
+func (f *fakeClient) StartApplication(_ context.Context, uuid string) error {
+	return f.recordLifecycle("start", uuid)
+}
+
+func (f *fakeClient) StopApplication(_ context.Context, uuid string) error {
+	return f.recordLifecycle("stop", uuid)
+}
+
+func (f *fakeClient) RestartApplication(_ context.Context, uuid string) error {
+	return f.recordLifecycle("restart", uuid)
+}
+
+func (f *fakeClient) recordLifecycle(action, uuid string) error {
+	f.lifecycle = append(f.lifecycle, action+":"+uuid)
+	return f.lifecycleErr
 }
 
 func (f *fakeClient) GetDatabase(_ context.Context, uuid string) (coolify.Database, error) {

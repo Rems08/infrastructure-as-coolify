@@ -13,7 +13,30 @@ import (
 
 func newTestModel(t *testing.T) Model {
 	t.Helper()
-	return NewModel(context.Background(), newFakeClient())
+	return NewModel(context.Background(), newFakeClient(), newFakeClient())
+}
+
+func TestNewModel_WiresExplorerAndMutator(t *testing.T) {
+	explorer := newFakeClient()
+	mutator := newFakeClient()
+	rec := &fakeRecorder{}
+	m := NewModel(context.Background(), explorer, mutator,
+		WithConfigPath("examples/beenaire"),
+		WithAuditor(rec),
+	)
+	if m.client == nil || m.mutator == nil {
+		t.Fatal("NewModel left explorer or mutator unwired")
+	}
+	if m.configPath != "examples/beenaire" {
+		t.Errorf("configPath = %q, want examples/beenaire", m.configPath)
+	}
+	if m.auditor == nil {
+		t.Error("WithAuditor did not wire the auditor")
+	}
+	// A nil auditor must be ignored, not stored.
+	if m2 := NewModel(context.Background(), explorer, mutator, WithAuditor(nil)); m2.auditor != nil {
+		t.Error("WithAuditor(nil) must leave the auditor unset")
+	}
 }
 
 func keyRunes(r rune) tea.KeyMsg { return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}} }

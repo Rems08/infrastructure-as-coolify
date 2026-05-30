@@ -350,15 +350,18 @@ iac-coolify explore ./coolify       # browse + drift against the config in ./coo
 | `↑`/`↓` `k`/`j` | move the cursor                              |
 | `↵`        | expand/collapse a container, or open a resource   |
 | `esc`/`backspace` | collapse, or jump to the parent            |
-| `r`        | reveal/hide a service's environment-variable values |
+| `r`        | reveal/hide masked environment-variable values    |
 | `D`        | drift: compare the selected application against its config |
 | `R`/`S`/`U` | restart / stop / start the selected application (asks `[y/N]`) |
 | `L`        | toggle the log pane                               |
 | `q`/`ctrl+c` | quit                                            |
 
-A service shows its environment variables as a table; every value is **masked by default**
-and only shown after you press `r`. Applications and databases show their structural fields
-(no environment-variable table).
+A service shows its live environment variables as a table; every value is **masked by
+default** and only shown after you press `r`. An application shows its structural fields and,
+when a config path is given and a desired Application matches by `(environment, name)`, an
+**ENV VARS (desired)** section read from the YAML: plain values are masked until `r`, and a
+secret is shown only by its source declaration (`${env:…}`/`${sops:…}`) — its resolved value
+is never read or displayed. Databases show their structural fields only.
 
 Press `D` on an application to see its **drift** — the per-field difference between the
 desired config and the live resource, matched by logical name. The drift view is read-only;
@@ -366,8 +369,8 @@ secret fields are never shown in cleartext. It needs a config path; without one 
 
 `R`/`S`/`U` trigger an application **lifecycle** action. Each asks for confirmation first
 (`[y/N]`) so a stray key cannot restart a service, and each action is recorded to the
-append-only audit log (`--audit-log`, default `.iac-coolify/audit.log`). Editing environment
-variables and writing changes back to YAML are not in the browser yet. `explore` requires an
+append-only audit log (`--audit-log`, default `.iac-coolify/audit.log`). Editing the desired
+env vars and writing changes back to YAML are not in the browser yet. `explore` requires an
 interactive terminal — in a pipe or CI it exits with an error rather than opening a UI.
 
 ## CI integration

@@ -23,11 +23,13 @@ type Model struct {
 
 	tree     tree
 	detail   *detail
+	confirm  *confirmState
 	logs     []LogMsg
 	showLogs bool
 
 	width, height int
 	loading       bool
+	status        string
 	err           error
 }
 

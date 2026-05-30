@@ -1,8 +1,12 @@
 package tui
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/Rems08/infrastructure-as-coolify/internal/resource"
 )
 
 // Update advances the model in response to a message. All remote work is dispatched as a
@@ -30,6 +34,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case LogMsg:
 		m.logs = append(m.logs, msg)
 		return m, nil
+	case mutationDoneMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			m.status = ""
+		} else {
+			m.err = nil
+			m.status = fmt.Sprintf("%s requested for %s", msg.action, msg.name)
+		}
+		return m, nil
 	case errMsg:
 		m.err = msg.err
 		m.loading = false
@@ -43,9 +56,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // handleKey applies a key press. Navigation mutates the tree in place; opening a leaf
 // returns a command that fetches its detail.
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// A live confirmation captures every key so an accidental press can neither escape it
+	// (e.g. q quitting mid-prompt) nor trigger another action.
+	if m.confirm != nil {
+		return m.handleConfirm(msg)
+	}
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
+	case key.Matches(msg, m.keys.Restart):
+		return m.startLifecycle(actionRestart)
+	case key.Matches(msg, m.keys.Stop):
+		return m.startLifecycle(actionStop)
+	case key.Matches(msg, m.keys.Start):
+		return m.startLifecycle(actionStart)
 	case key.Matches(msg, m.keys.Logs):
 		m.showLogs = !m.showLogs
 		return m, nil
@@ -71,6 +95,37 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+// startLifecycle arms a confirmation prompt for a lifecycle action on the selected
+// application. Lifecycle actions apply to applications only; on any other node it is a
+// no-op. The mutation is not run here — it is deferred to the command in confirmState.
+func (m Model) startLifecycle(action string) (tea.Model, tea.Cmd) {
+	n := m.tree.selected()
+	if n == nil || !n.isLeaf() || n.kind != resource.KindApplication {
+		return m, nil
+	}
+	m.confirm = &confirmState{
+		prompt:    fmt.Sprintf("%s application %q? [y/N]", action, n.label),
+		onConfirm: lifecycleCmd(m.ctx, m.mutator, m.auditor, action, n.key, n.uuid),
+	}
+	return m, nil
+}
+
+// handleConfirm consumes a key press while a confirmation is active. Only y runs the armed
+// command; n or esc cancels; every other key is swallowed so the prompt stays modal.
+func (m Model) handleConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "Y":
+		cmd := m.confirm.onConfirm
+		m.confirm = nil
+		return m, cmd
+	case "n", "N", "esc":
+		m.confirm = nil
+		return m, nil
+	default:
+		return m, nil
+	}
 }
 
 func ptr(d detail) *detail { return &d }

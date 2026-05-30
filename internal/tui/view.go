@@ -14,6 +14,8 @@ var (
 	kindStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
 	errStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
 	revealedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	confirmStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
+	statusStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
 )
 
 // View renders the whole screen: a header, the tree/detail split (or the log pane), and a
@@ -30,6 +32,14 @@ func (m Model) View() string {
 		b.WriteString(m.renderLogs())
 	default:
 		b.WriteString(m.renderBrowser())
+	}
+	if m.confirm != nil {
+		b.WriteByte('\n')
+		b.WriteString(confirmStyle.Render(m.confirm.prompt))
+	}
+	if m.status != "" {
+		b.WriteByte('\n')
+		b.WriteString(statusStyle.Render(m.status))
 	}
 	if m.err != nil {
 		b.WriteByte('\n')

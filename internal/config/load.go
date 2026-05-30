@@ -1,8 +1,13 @@
 // Package config is the boundary between user-authored YAML and the typed resource model.
 // It loads a config tree (one file per resource, walked recursively), decodes each manifest
-// strictly so unknown or duplicate fields are rejected, resolves ${env:VAR} and ${sops:path}
-// interpolation, and validates every field with line/column positions before any business
-// code runs — apply and plan trust the structs they receive.
+// strictly so unknown or duplicate fields are rejected, and validates every field with
+// line/column positions before any business code runs — apply and plan trust the structs
+// they receive.
+//
+// Loading is lenient: ${env:VAR} references (visible values and typed secrets alike) are kept
+// unresolved so validate, plan and explore never require an env var to be set. The values are
+// bound only at apply, by ResolveSecrets. Pending ${sops:path} secrets are the exception —
+// they are decrypted at load, since SOPS resolution needs the manifest directory.
 //
 // The public entry points load one kind each from a target path:
 // LoadProjects, LoadEnvironments, LoadApplications, LoadServices, LoadDatabases, and
@@ -37,19 +42,14 @@ func PeekKind(path string) (string, error) {
 	return head.Kind, nil
 }
 
-// LoadApplication parses a YAML file into an Application with strict decoding (unknown
-// and duplicate fields are rejected) and resolves ${env:VAR} interpolation in visible
-// env-var values.
+// LoadApplication parses a YAML file into an Application with strict decoding (unknown and
+// duplicate fields are rejected). ${env:VAR} references are kept unresolved — the value is
+// bound at apply by ResolveSecrets, so load stays lenient and needs no env var set. Pending
+// ${sops:path} secrets are decrypted here, since SOPS resolution needs the manifest directory.
 func LoadApplication(path string) (resource.Application, error) {
 	var app resource.Application
 	if err := loadStrict(path, &app); err != nil {
 		return app, err
-	}
-	if err := interpolateApplicationFields(&app); err != nil {
-		return app, fmt.Errorf("%s: %w", path, err)
-	}
-	if err := interpolateEntries(app.Spec.EnvVars); err != nil {
-		return app, fmt.Errorf("%s: %w", path, err)
 	}
 	if err := resolveSecretEntries(path, app.Spec.EnvVars); err != nil {
 		return app, fmt.Errorf("%s: %w", path, err)
@@ -69,17 +69,15 @@ func LoadDatabase(path string) (resource.Database, error) {
 	return db, nil
 }
 
-// LoadEnvVar parses a YAML file into a standalone EnvVar resource with strict decoding,
-// resolving ${env:VAR} interpolation in visible values.
+// LoadEnvVar parses a YAML file into a standalone EnvVar resource with strict decoding.
+// Metadata coordinates are interpolated, but ${env:VAR} values are kept unresolved (bound at
+// apply); pending ${sops:path} secrets are decrypted here.
 func LoadEnvVar(path string) (resource.EnvVar, error) {
 	var ev resource.EnvVar
 	if err := loadStrict(path, &ev); err != nil {
 		return ev, err
 	}
 	if err := interpolateStrings(&ev.Metadata.Name, &ev.Metadata.Project, &ev.Metadata.Environment); err != nil {
-		return ev, fmt.Errorf("%s: %w", path, err)
-	}
-	if err := interpolateEntries(ev.Spec.Vars); err != nil {
 		return ev, fmt.Errorf("%s: %w", path, err)
 	}
 	if err := resolveSecretEntries(path, ev.Spec.Vars); err != nil {
@@ -112,19 +110,14 @@ func LoadEnvironment(path string) (resource.Environment, error) {
 	return e, nil
 }
 
-// LoadService parses a YAML file into a Service with strict decoding, resolving
-// ${env:VAR} interpolation in visible env-var values. It does not read the referenced
-// compose file; LoadServices does, after the path-traversal check.
+// LoadService parses a YAML file into a Service with strict decoding. ${env:VAR} references
+// are kept unresolved (bound at apply by ResolveSecrets); pending ${sops:path} secrets are
+// decrypted here. It does not read the referenced compose file; LoadServices does, after the
+// path-traversal check.
 func LoadService(path string) (resource.Service, error) {
 	var s resource.Service
 	if err := loadStrict(path, &s); err != nil {
 		return s, err
-	}
-	if err := interpolateServiceFields(&s); err != nil {
-		return s, fmt.Errorf("%s: %w", path, err)
-	}
-	if err := interpolateEntries(s.Spec.EnvVars); err != nil {
-		return s, fmt.Errorf("%s: %w", path, err)
 	}
 	if err := resolveSecretEntries(path, s.Spec.EnvVars); err != nil {
 		return s, fmt.Errorf("%s: %w", path, err)

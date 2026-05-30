@@ -58,18 +58,36 @@ func NewFromEnv(envName string) (Secret, error) {
 	return Secret{value: v, source: SourceEnv, origin: "${env:" + envName + "}"}, nil
 }
 
+// ResolveEnv resolves a deferred ${env:NAME} reference (origin-only, carrying no value) to a
+// concrete Secret by looking the env var up now. It is the apply-time companion to the lenient
+// decoder: load keeps the reference, apply binds it to a value. Any Secret that is not an
+// unresolved env reference (already resolved, SOPS, remote, or unset) is returned unchanged.
+func ResolveEnv(s Secret) (Secret, error) {
+	if !s.IsUnresolvedEnv() {
+		return s, nil
+	}
+	name, _ := envRef(s.origin)
+	return NewFromEnv(name)
+}
+
+// IsUnresolvedEnv reports whether s is an ${env:} reference whose value has not been looked up
+// yet. Read-only flows (load, validate, plan, explore) keep secrets in this state; only apply
+// resolves them. The diff engine treats an unresolved desired secret as value-unknown so it
+// never reports a phantom change against a remote value.
+func (s Secret) IsUnresolvedEnv() bool { return s.source == SourceEnv && s.value == "" }
+
 // NewFromSOPS builds a Secret from a SOPS-decrypted value.
 func NewFromSOPS(decrypted, path string) Secret {
 	return Secret{value: decrypted, source: SourceSOPS, origin: "${sops:" + path + "}"}
 }
 
 // NewReference builds a Secret from a source declaration (${env:NAME} or ${sops:path})
-// without resolving its value. It is the write-back companion to UnmarshalYAML: a reference
-// being edited and serialised back needs only its origin (MarshalYAML emits the origin, never
-// a value), so no env lookup or SOPS decryption happens here — the env var need not be set
-// where the edit is made, only where the manifest is later applied. A literal (anything not
-// matching the two reference forms) is rejected, so a secret can never be downgraded to a
-// hardcoded value.
+// without resolving its value: it carries only its origin, so no env lookup or SOPS
+// decryption happens here. The env var need not be set where the manifest is loaded or
+// edited, only where it is later applied — load, validate, plan and explore stay lenient,
+// and ResolveEnv (env) / NewFromSOPS (sops) supply the value at apply time. A literal
+// (anything not matching the two reference forms) is rejected, so a secret can never be
+// downgraded to a hardcoded value. This is the decoder used by UnmarshalYAML.
 func NewReference(raw string) (Secret, error) {
 	if name, ok := envRef(raw); ok {
 		return Secret{source: SourceEnv, origin: "${env:" + name + "}"}, nil
@@ -161,23 +179,16 @@ func (s *Secret) UnmarshalYAML(b []byte) error {
 	return s.parse(raw)
 }
 
+// parse decodes a source declaration into an origin-only Secret. An ${env:} reference keeps
+// its origin without an env lookup (the value is resolved later by ResolveEnv, at apply); an
+// ${sops:} reference is left pending for the load-time decryption pass. A literal is rejected.
 func (s *Secret) parse(raw string) error {
-	if name, ok := envRef(raw); ok {
-		sec, err := NewFromEnv(name)
-		if err != nil {
-			return err
-		}
-		*s = sec
-		return nil
+	sec, err := NewReference(raw)
+	if err != nil {
+		return err
 	}
-	if path, ok := sopsRef(raw); ok {
-		*s = Secret{source: SourceSOPS, origin: "${sops:" + path + "}", pending: true}
-		return nil
-	}
-	return fmt.Errorf(
-		"secrets: literal value forbidden, use ${env:NAME} or ${sops:path}, got: %s",
-		redactPreview(raw),
-	)
+	*s = sec
+	return nil
 }
 
 // sopsRef extracts the dotted path from "${sops:path}", returning ok=false otherwise.

@@ -171,6 +171,8 @@ func TestUnmarshalYAML_AcceptsEnvPattern(t *testing.T) {
 	}
 	for _, name := range cases {
 		t.Run(name, func(t *testing.T) {
+			// Set the env var to prove decoding does NOT consume it: the secret stays an
+			// origin-only reference, resolved to a value only later, at apply.
 			t.Setenv(name, "value-"+name)
 			var s Secret
 			doc := "value_secret: ${env:" + name + "}\n"
@@ -184,8 +186,14 @@ func TestUnmarshalYAML_AcceptsEnvPattern(t *testing.T) {
 			if s.IsZero() {
 				t.Fatal("secret is zero after unmarshal")
 			}
-			if s.Reveal() != "value-"+name {
-				t.Errorf("Reveal() = %q, want %q", s.Reveal(), "value-"+name)
+			if want := "${env:" + name + "}"; s.Origin() != want {
+				t.Errorf("Origin() = %q, want %q", s.Origin(), want)
+			}
+			if !s.IsUnresolvedEnv() {
+				t.Error("decoded env secret must be unresolved (no value) until apply")
+			}
+			if s.Reveal() != "" {
+				t.Errorf("Reveal() = %q, want empty (value deferred to apply)", s.Reveal())
 			}
 		})
 	}
@@ -199,8 +207,7 @@ func TestUnmarshalYAML_RejectsLiteral(t *testing.T) {
 		"",
 		"   ",
 		"env:NO_DOLLAR_BRACE",
-		"${env:lowercase}", // lowercase env name not matched by NewFromEnv path
-		"${ENV:UPPER}",     // wrong prefix case
+		"${ENV:UPPER}", // wrong prefix case
 		"${ env:SPACE }",
 		"prefix ${env:X}", // env ref not anchored
 	}

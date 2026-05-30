@@ -7,26 +7,29 @@ import (
 )
 
 // desiredPath points at the testdata Application that carries env vars (one plain, one
-// secret). WEB_DB_URL must be set before loading because an ${env:} secret resolves at
-// decode time.
+// secret). Loading is lenient: WEB_DB_URL need not be set, the secret keeps its ${env:}
+// origin and is resolved only at apply.
 func desiredPath() string { return filepath.Join("testdata", "desired") }
 
+// TestLoadDesiredCmd_BuildsIndexByEnvName is the W5c dogfood regression for explore: the
+// desired index builds with no secret env var set, and a secret row exposes its ${env:}
+// origin rather than failing the load.
 func TestLoadDesiredCmd_BuildsIndexByEnvName(t *testing.T) {
-	t.Setenv("WEB_DB_URL", "postgres://example")
-
 	msg, ok := loadDesiredCmd(desiredPath())().(desiredLoadedMsg)
 	if !ok {
 		t.Fatalf("loadDesiredCmd returned %T, want desiredLoadedMsg", msg)
 	}
 	if msg.err != nil {
-		t.Fatalf("unexpected error: %v", msg.err)
+		t.Fatalf("desired index must load without env set: %v", msg.err)
 	}
 	m := NewModel(context.Background(), newFakeClient(), newFakeClient())
 	m.desired = msg.index
 
-	if f, ok := m.desiredFor("staging", "web"); !ok {
+	f, ok := m.desiredFor("staging", "web")
+	if !ok {
 		t.Fatal("desiredFor(staging, web) not found")
-	} else if filepath.Base(f.Path) != "web.yaml" {
+	}
+	if filepath.Base(f.Path) != "web.yaml" {
 		t.Errorf("matched file = %q, want web.yaml", f.Path)
 	}
 	if _, ok := m.desiredFor("production", "web"); ok {
@@ -34,6 +37,16 @@ func TestLoadDesiredCmd_BuildsIndexByEnvName(t *testing.T) {
 	}
 	if _, ok := m.desiredFor("staging", "absent"); ok {
 		t.Error("desiredFor matched an absent name")
+	}
+
+	var sawSecretOrigin bool
+	for _, row := range desiredEnvRows(f.Application.Spec.EnvVars) {
+		if row.secret && row.display == "${env:WEB_DB_URL}" {
+			sawSecretOrigin = true
+		}
+	}
+	if !sawSecretOrigin {
+		t.Error("secret desired row did not expose its ${env:WEB_DB_URL} origin")
 	}
 }
 
@@ -53,8 +66,6 @@ func TestLoadDesiredCmd_EmptyPathYieldsEmptyIndex(t *testing.T) {
 // TestUpdate_ResolveTriggersDesiredLoad checks that completing the initial resolve dispatches
 // the desired-index load and that the resulting message populates the model.
 func TestUpdate_ResolveTriggersDesiredLoad(t *testing.T) {
-	t.Setenv("WEB_DB_URL", "postgres://example")
-
 	m := NewModel(context.Background(), newFakeClient(), newFakeClient(), WithConfigPath(desiredPath()))
 	m, cmd := step(t, m, m.Init()()) // resolvedMsg → returns loadDesiredCmd
 	if cmd == nil {

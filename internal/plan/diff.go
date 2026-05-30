@@ -142,6 +142,12 @@ func diffSecret(path string, old, newv secrets.Secret) (Change, bool) {
 	if old.Origin() != newv.Origin() {
 		return Change{Op: OpUpdate, Path: path, Old: old.Origin(), New: newv.Origin(), Sensitive: true}, true
 	}
+	// A desired secret loaded read-only carries no value (its ${env:} reference is bound only
+	// at apply). The source is unchanged, so comparing the absent value against the remote one
+	// would report a phantom "resolved value changed"; with the same origin it is a no-op.
+	if newv.IsUnresolvedEnv() {
+		return Change{}, false
+	}
 	if old.ValueEquals(newv) {
 		return Change{}, false
 	}

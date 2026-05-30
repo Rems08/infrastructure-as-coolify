@@ -160,6 +160,13 @@ func buildOperations(ctx context.Context, cmd *cobra.Command, client *coolify.Cl
 		return nil, err
 	}
 
+	// Load keeps ${env:} references unresolved; apply is the one place they are bound to a
+	// value, so an unset env var fails here with a clear message instead of pushing an empty
+	// value. destroy never calls this — it has no use for the resolved values.
+	if err = config.ResolveSecrets(apps, services, dbs); err != nil {
+		return nil, err
+	}
+
 	if vErr := validateSelection(cmd, opts.only, opts.envFilter, opts.target, projects, envs, apps, services, dbs); vErr != nil {
 		return nil, vErr
 	}

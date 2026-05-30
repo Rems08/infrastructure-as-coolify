@@ -119,6 +119,8 @@ func TestApplicationValidate(t *testing.T) {
 }
 
 func TestApplicationParseRoundtrip(t *testing.T) {
+	// Decoding is lenient: even with DBURL set, the secret keeps its origin and is not
+	// resolved to a value (that happens at apply, via config.ResolveSecrets).
 	t.Setenv("DBURL", "postgres://real")
 	const withSecret = validYAML + `    - name: DATABASE_URL
       value_secret: ${env:DBURL}
@@ -127,7 +129,7 @@ func TestApplicationParseRoundtrip(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(withSecret), &got); err != nil {
 		t.Fatal(err)
 	}
-	dbSecret, err := secrets.NewFromEnv("DBURL")
+	dbSecret, err := secrets.NewReference("${env:DBURL}")
 	if err != nil {
 		t.Fatal(err)
 	}

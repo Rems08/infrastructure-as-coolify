@@ -86,6 +86,62 @@ func interpolateServiceFields(svc *resource.Service) error {
 	)
 }
 
+// ResolveSecrets binds every deferred ${env:VAR} reference in the desired resources to its
+// concrete value, in place, just before apply. Load keeps references unresolved so read-only
+// flows stay lenient; this is the single explicit pass — the apply-time companion to the
+// lenient loaders — that resolves them. It covers visible (Param) fields, plain env-var
+// values and typed env secrets for applications and services, and the password of every
+// database. SOPS secrets are already decrypted at load and pass through untouched. A
+// referenced env var that is unset yields a clear error naming the resource, so apply fails
+// before any push rather than sending an empty value.
+func ResolveSecrets(apps []resource.Application, services []LoadedService, dbs []resource.Database) error {
+	for i := range apps {
+		app := &apps[i]
+		if err := interpolateApplicationFields(app); err != nil {
+			return fmt.Errorf("application %q: %w", app.Metadata.Name, err)
+		}
+		if err := interpolateEntries(app.Spec.EnvVars); err != nil {
+			return fmt.Errorf("application %q: %w", app.Metadata.Name, err)
+		}
+		if err := resolveEnvSecretEntries(app.Spec.EnvVars); err != nil {
+			return fmt.Errorf("application %q: %w", app.Metadata.Name, err)
+		}
+	}
+	for i := range services {
+		svc := &services[i].Service
+		if err := interpolateServiceFields(svc); err != nil {
+			return fmt.Errorf("service %q: %w", svc.Metadata.Name, err)
+		}
+		if err := interpolateEntries(svc.Spec.EnvVars); err != nil {
+			return fmt.Errorf("service %q: %w", svc.Metadata.Name, err)
+		}
+		if err := resolveEnvSecretEntries(svc.Spec.EnvVars); err != nil {
+			return fmt.Errorf("service %q: %w", svc.Metadata.Name, err)
+		}
+	}
+	for i := range dbs {
+		resolved, err := secrets.ResolveEnv(dbs[i].Spec.Password)
+		if err != nil {
+			return fmt.Errorf("database %q password: %w", dbs[i].Metadata.Name, err)
+		}
+		dbs[i].Spec.Password = resolved
+	}
+	return nil
+}
+
+// resolveEnvSecretEntries binds every deferred ${env:} typed secret in entries to its value.
+// A plain value or an already-resolved/SOPS secret is left untouched.
+func resolveEnvSecretEntries(entries []resource.EnvVarEntry) error {
+	for i := range entries {
+		resolved, err := secrets.ResolveEnv(entries[i].ValueSecret)
+		if err != nil {
+			return fmt.Errorf("env_vars[%d] %q: %w", i, entries[i].Name, err)
+		}
+		entries[i].ValueSecret = resolved
+	}
+	return nil
+}
+
 // resolveSecretEntries decrypts any pending ${sops:path} secret in entries, reading the
 // secrets.enc.yaml colocated with iacPath. ${env:} secrets are resolved at decode time and
 // left untouched here.

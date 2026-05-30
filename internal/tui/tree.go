@@ -23,8 +23,18 @@ type treeNode struct {
 	expanded bool
 }
 
-// isLeaf reports whether the node is a fetchable resource rather than a container.
-func (n *treeNode) isLeaf() bool { return len(n.children) == 0 && n.kind != kindGroup }
+// isLeaf reports whether the node is a fetchable resource rather than a container. It keys on
+// the kind, not on the child count: a project or environment is always a container that
+// expands, even before its children are resolved (an empty one must still toggle, never stick
+// on a detail load it has no endpoint for).
+func (n *treeNode) isLeaf() bool {
+	switch n.kind {
+	case resource.KindApplication, resource.KindService, resource.KindDatabase:
+		return true
+	default:
+		return false
+	}
+}
 
 // buildTree turns a resolved UUID map into the project → environment → resource hierarchy.
 // Applications and services carry their (project, environment) coordinates and nest under

@@ -101,6 +101,41 @@ func TestTree_CollapseMovesToParent(t *testing.T) {
 	}
 }
 
+func TestIsLeaf_KindBased(t *testing.T) {
+	cases := []struct {
+		kind string
+		leaf bool
+	}{
+		{resource.KindApplication, true},
+		{resource.KindService, true},
+		{resource.KindDatabase, true},
+		{resource.KindProject, false},
+		{resource.KindEnvironment, false},
+		{kindGroup, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.kind, func(t *testing.T) {
+			// No children resolved: a container kind must still report as a non-leaf so it
+			// expands rather than triggering a detail load it has no endpoint for.
+			n := &treeNode{kind: tc.kind}
+			if got := n.isLeaf(); got != tc.leaf {
+				t.Errorf("isLeaf(%q) = %v, want %v", tc.kind, got, tc.leaf)
+			}
+		})
+	}
+}
+
+func TestToggle_EmptyEnvironmentExpandsNotLeaf(t *testing.T) {
+	env := &treeNode{label: "staging", kind: resource.KindEnvironment}
+	tr := tree{roots: []*treeNode{env}}
+	if leaf := tr.toggle(); leaf != nil {
+		t.Fatalf("toggle on a childless environment returned leaf %v, want expand", leaf)
+	}
+	if !env.expanded {
+		t.Error("childless environment did not toggle expanded")
+	}
+}
+
 func TestTree_UpDownBounds(t *testing.T) {
 	tr := tree{roots: buildTree(resolvedFake(t))}
 	tr.up() // already at top, no-op

@@ -255,7 +255,9 @@ rotating a password is an explicit future operation rather than reconciled drift
 Any visible (Param) string field can reference an environment variable with
 `${env:VAR}` — `metadata` names, `image.name`/`image.tag`, `fqdn`, a git `source`, an
 inline `dockerfile`, `destination`, `limits`, and plain `env_vars` values. References are
-resolved at load time; an unset variable is an error (no silent fallback to `""`).
+resolved at `apply`, just before the value is pushed; an unset variable is then an error (no
+silent fallback to `""`). `validate`, `plan` and `explore` keep references unresolved and need
+no variable set.
 
 ```yaml
 metadata:
@@ -297,6 +299,11 @@ env_vars:
   - name: STRIPE_KEY
     value_secret: "${sops:stripe.key}"      # secret, SOPS-decrypted, REDACTED
 ```
+
+`${env:…}` references (secrets and visible values alike) resolve at `apply`, not at load:
+`validate`, `plan` and `explore` keep them unresolved and need no variable set, while `apply`
+binds them and fails with a clear, resource-named error if one is missing. `${sops:…}` is
+decrypted at load. `validate --strict` therefore no longer flags an unset secret env var.
 
 ### SOPS + age secrets at rest
 

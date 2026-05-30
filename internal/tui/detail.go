@@ -50,6 +50,9 @@ type detail struct {
 	desiredEnvs []desiredEnvRow
 	desiredNote string
 	revealed    bool
+	// loading marks a placeholder shown while a leaf's detail is fetched, so an error or a
+	// kind with no detail endpoint can clear it instead of leaving it stuck.
+	loading bool
 
 	// env and name are the logical coordinates of an application detail, used to match the
 	// desired config and to target an edit; envCursor selects the desired env row to edit.
@@ -178,5 +181,5 @@ func serviceDetail(name string, envs []coolify.ServiceEnvVar) detail {
 
 // placeholder describes a leaf that has been selected but whose detail has not arrived yet.
 func loadingDetail(node *treeNode) detail {
-	return detail{kind: node.kind, title: fmt.Sprintf("%s (loading…)", node.label)}
+	return detail{kind: node.kind, title: fmt.Sprintf("%s (loading…)", node.label), loading: true}
 }

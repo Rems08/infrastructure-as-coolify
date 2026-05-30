@@ -159,6 +159,39 @@ func TestSecretToScalarFlip(t *testing.T) {
 	}
 }
 
+// TestSecretUnresolvedDesiredNoFalsePositive guards the read-only flow: a desired secret
+// loaded without its value (its ${env:} reference is bound only at apply) must not diff as a
+// phantom "resolved value changed" against a remote value when the source is unchanged.
+func TestSecretUnresolvedDesiredNoFalsePositive(t *testing.T) {
+	old := secretEnv(t, "DBURL_X", "postgres://live")
+	newv, err := secrets.NewReference("${env:DBURL_X}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	desired := res("Application", "web", f("env.DATABASE_URL", plan.SecretValue(newv)))
+	actual := res("Application", "web", f("env.DATABASE_URL", plan.SecretValue(old)))
+	if changes := plan.Diff(desired, &actual); len(changes) != 0 {
+		t.Errorf("Diff = %+v, want no change for an unresolved desired secret", changes)
+	}
+}
+
+// TestSecretDifferentOriginStillUpdates asserts a genuinely changed source is still reported
+// even when the desired secret is unresolved, and without leaking any value.
+func TestSecretDifferentOriginStillUpdates(t *testing.T) {
+	old := secretEnv(t, "OLD_REF", "live-value")
+	newv, err := secrets.NewReference("${env:NEW_REF}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	desired := res("Application", "web", f("env.X", plan.SecretValue(newv)))
+	actual := res("Application", "web", f("env.X", plan.SecretValue(old)))
+	changes := plan.Diff(desired, &actual)
+	if len(changes) != 1 || changes[0].Op != plan.OpUpdate {
+		t.Fatalf("Diff = %+v, want one Update on a differing origin", changes)
+	}
+	assertNoLeak(t, changes[0], "live-value")
+}
+
 func assertNoLeak(t *testing.T, c plan.Change, secret string) {
 	t.Helper()
 	if strings.Contains(c.Old, secret) || strings.Contains(c.New, secret) {

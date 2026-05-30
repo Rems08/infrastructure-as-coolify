@@ -46,7 +46,7 @@ func newFakeClient() *fakeClient {
 	return &fakeClient{
 		projects: []coolify.Project{{ID: 1, UUID: "p1", Name: "restaurant-core"}},
 		envs: map[string][]coolify.Environment{
-			"p1": {{ID: 10, Name: "staging", ProjectID: 1}},
+			"p1": {{ID: 10, Name: "staging"}},
 		},
 		servers:  []coolify.Server{{UUID: "s1", Name: "hetzner"}},
 		apps:     []coolify.Application{{UUID: "a1", Name: "web", EnvironmentID: 10}},

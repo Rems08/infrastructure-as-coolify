@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed (resolver)
+
+- `explore`, `plan` and `apply` now resolve applications and services against a live Coolify
+  instance. The resolver derived each resource's owning project from the environment's
+  `project_id`, but `GET /projects/{uuid}/environments` does not populate that field at
+  runtime — so every application and service was silently dropped, leaving environments empty
+  in `explore` and every resource seen as unmanaged in `plan`/`apply`. The project is now
+  captured while enumerating each project's environments, and a resource whose
+  `environment_id` cannot be matched is logged and counted instead of dropped in silence.
+
 ### Changed (lenient load)
 
 - Loading a config no longer requires the referenced `${env:…}` variables to be set.

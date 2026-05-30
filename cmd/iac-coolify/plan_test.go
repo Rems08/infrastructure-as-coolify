@@ -62,7 +62,7 @@ func coolifyMux(t *testing.T, fqdn string) *httptest.Server {
 		`"docker_registry_image_name":"registry.example.com/demo/web","docker_registry_image_tag":"v1-0-0"}`
 	bodies := map[string]string{
 		"/api/v1/projects":                 `[{"id":1,"uuid":"p1","name":"demo"}]`,
-		"/api/v1/projects/p1/environments": `[{"id":10,"name":"staging","project_id":1}]`,
+		"/api/v1/projects/p1/environments": `[{"id":10,"name":"staging"}]`,
 		"/api/v1/servers":                  `[{"uuid":"srv-1","name":"localhost"}]`,
 		"/api/v1/applications":             `[` + app + `]`,
 		"/api/v1/applications/u-web":       app,

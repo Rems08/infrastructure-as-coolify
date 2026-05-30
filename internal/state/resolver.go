@@ -77,20 +77,18 @@ func Resolve(ctx context.Context, client resolverClient) (Map, error) {
 		return nil, fmt.Errorf("resolve: list projects: %w", err)
 	}
 	m := make(Map)
-	projectByID := make(map[int]coolify.Project, len(projects))
 	for _, p := range projects {
-		projectByID[p.ID] = p
 		m[ResourceKey{Kind: resource.KindProject, Name: p.Name}] = p.UUID
 	}
 
-	envByID := make(map[int]coolify.Environment)
+	envByID := make(map[int]envRef)
 	for _, p := range projects {
 		envs, eErr := client.ListEnvironments(ctx, p.UUID)
 		if eErr != nil {
 			return nil, fmt.Errorf("resolve: list environments for project %q: %w", p.Name, eErr)
 		}
 		for _, e := range envs {
-			envByID[e.ID] = e
+			envByID[e.ID] = envRef{name: e.Name, project: p.Name}
 			m[ResourceKey{Project: p.Name, Kind: resource.KindEnvironment, Name: e.Name}] = e.Name
 		}
 	}
@@ -107,8 +105,9 @@ func Resolve(ctx context.Context, client resolverClient) (Map, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve: list applications: %w", err)
 	}
+	var counts childCounts
 	for _, a := range apps {
-		mapChild(m, envByID, projectByID, resource.KindApplication, a.Name, a.UUID, a.EnvironmentID)
+		mapChild(ctx, m, envByID, &counts, resource.KindApplication, a.Name, a.UUID, a.EnvironmentID)
 	}
 
 	services, err := client.ListServices(ctx)
@@ -116,8 +115,12 @@ func Resolve(ctx context.Context, client resolverClient) (Map, error) {
 		return nil, fmt.Errorf("resolve: list services: %w", err)
 	}
 	for _, s := range services {
-		mapChild(m, envByID, projectByID, resource.KindService, s.Name, s.UUID, s.EnvironmentID)
+		mapChild(ctx, m, envByID, &counts, resource.KindService, s.Name, s.UUID, s.EnvironmentID)
 	}
+	slog.InfoContext(ctx, "resolved applications and services",
+		"resolver.children.resolved", counts.resolved,
+		"resolver.children.dropped", counts.dropped,
+	)
 
 	if err := resolveDatabases(ctx, client, servers, m); err != nil {
 		return nil, err
@@ -156,19 +159,39 @@ func resolveDatabases(ctx context.Context, c resolverClient, servers []coolify.S
 	return nil
 }
 
+// envRef is the (environment name, project name) pair an application or service is keyed
+// under. The project is captured while enumerating each project's environments, not read
+// from the environment payload: GET /projects/{uuid}/environments does not populate
+// project_id at runtime, so deriving it there would drop every child (see mapChild).
+type envRef struct {
+	name    string
+	project string
+}
+
+// childCounts tallies how many applications and services were keyed versus skipped, so the
+// resolver reports coverage instead of dropping unmapped resources in silence.
+type childCounts struct {
+	resolved int
+	dropped  int
+}
+
 // mapChild keys an application or service by its (project, environment, name) coordinates,
-// resolved from its environment_id. An item in an environment we couldn't enumerate is
-// skipped rather than mis-keyed.
-func mapChild(m Map, envByID map[int]coolify.Environment, projectByID map[int]coolify.Project, kind, name, uuid string, envID int) {
-	env, ok := envByID[envID]
+// resolved from its environment_id. An item whose environment_id was not enumerated is
+// counted and logged rather than dropped silently, so a future API divergence surfaces at
+// once instead of leaving environments mysteriously empty.
+func mapChild(ctx context.Context, m Map, envByID map[int]envRef, counts *childCounts, kind, name, uuid string, envID int) {
+	ref, ok := envByID[envID]
 	if !ok {
+		counts.dropped++
+		slog.WarnContext(ctx, "resolve: resource skipped, environment_id not found",
+			"resolver.child.kind", kind,
+			"resolver.child.name", name,
+			"resolver.child.environment_id", envID,
+		)
 		return
 	}
-	project, ok := projectByID[env.ProjectID]
-	if !ok {
-		return
-	}
-	m[ResourceKey{Project: project.Name, Environment: env.Name, Kind: kind, Name: name}] = uuid
+	counts.resolved++
+	m[ResourceKey{Project: ref.project, Environment: ref.name, Kind: kind, Name: name}] = uuid
 }
 
 // Save writes the resolved map to an opt-in JSON cache at path (used by --state-cache).

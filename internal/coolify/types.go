@@ -31,13 +31,18 @@ type Project struct {
 	Name string `json:"name"`
 }
 
-// Environment mirrors components.schemas.Environment. ProjectID links it back to a
-// Project.ID; ID links an Application/Database back to its environment. The schema has
-// no UUID: the API addresses an environment by name (environment_name_or_uuid).
+// Environment mirrors components.schemas.Environment. ID links an Application or Service
+// back to its environment. The schema has no UUID: the API addresses an environment by name
+// (environment_name_or_uuid).
+//
+// project_id is intentionally not decoded: the spec declares it, but GET
+// /projects/{uuid}/environments does not populate it at runtime, so it is always zero. The
+// resolver derives the owning project while enumerating each project's environments (see
+// state.envRef) — do not re-add a ProjectID field and key children on it, or every
+// application and service is dropped.
 type Environment struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	ProjectID int    `json:"project_id"`
+	ID   int    `json:"id"`
+	Name string `json:"name"`
 }
 
 // Server mirrors the subset of components.schemas.Server the resolver needs to map a

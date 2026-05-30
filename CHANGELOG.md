@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added (application mutations & write-back)
+
+- Low-level Coolify client methods for applications: `start`, `stop` and `restart` — the
+  `GET /applications/{uuid}/{action}` lifecycle, distinct from the service `POST`
+  lifecycle — and environment-variable management: list (`GET .../envs`), bulk update
+  (`PATCH .../envs/bulk`, the only create/update path the application API exposes) and
+  delete (`DELETE .../envs/{env_uuid}`, where a `404` is a no-op). A secret env value is
+  revealed only at the HTTP boundary, never carried by the caller.
+- A YAML marshaller (`config.WriteApplication`) that serialises an `Application` back to a
+  manifest atomically (temp file then rename, preserving an existing file's mode). A secret
+  is written as its `${env:…}`/`${sops:…}` source declaration, never its resolved value, and
+  a secret carrying no such declaration is refused before any write. These are internal
+  building blocks for an upcoming interactive write-back; no new CLI command is exposed yet.
+
 ### Added (explore)
 
 - `iac-coolify explore` (alias `tui`): a read-only terminal browser over a live Coolify

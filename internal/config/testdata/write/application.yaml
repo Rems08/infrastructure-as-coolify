@@ -1,0 +1,24 @@
+api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: api
+  project: beenaire
+  environment: staging
+spec:
+  build_pack: dockerimage
+  image:
+    name: registry.example.com/demo/api
+    tag: v1-0-0
+  destination:
+    server: localhost
+    network: coolify
+  fqdn: https://api.example.com
+  port: 8080
+  health_check:
+    enabled: true
+    path: /health
+  env_vars:
+    - name: NODE_ENV
+      value: production
+    - name: SECRET_KEY
+      value_secret: ${env:APP_SECRET_KEY}

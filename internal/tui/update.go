@@ -30,7 +30,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.desired = msg.index
 		return m, nil
 	case appDetailMsg:
-		m.detail = ptr(applicationDetail(msg.app))
+		d := applicationDetail(msg.app)
+		m.attachDesired(&d, msg.env, msg.name)
+		m.detail = &d
 		return m, nil
 	case dbDetailMsg:
 		m.detail = ptr(databaseDetail(msg.db))
@@ -88,7 +90,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showLogs = !m.showLogs
 		return m, nil
 	case key.Matches(msg, m.keys.Reveal):
-		if m.detail != nil && m.detail.hasEnvs() {
+		if m.detail != nil && m.detail.hasMaskableValues() {
 			m.detail.revealed = !m.detail.revealed
 		}
 		return m, nil

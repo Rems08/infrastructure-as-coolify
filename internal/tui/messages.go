@@ -16,8 +16,13 @@ type resolvedMsg struct{ m state.Map }
 
 // appDetailMsg, dbDetailMsg and svcDetailMsg carry a fetched resource's detail. A service
 // also carries its environment variables (the only resource with a listable env set on the
-// read path); applications and databases expose their fields through the struct alone.
-type appDetailMsg struct{ app coolify.Application }
+// read path); applications and databases expose their fields through the struct alone. An
+// application carries its (environment, name) coordinates so the update loop can match it to
+// the desired config without a second lookup of the selection.
+type appDetailMsg struct {
+	app       coolify.Application
+	env, name string
+}
 type dbDetailMsg struct{ db coolify.Database }
 type svcDetailMsg struct {
 	name string
@@ -43,7 +48,7 @@ func resolveCmd(ctx context.Context, client explorerClient) tea.Cmd {
 // loadDetailCmd fetches the detail of a leaf resource. The endpoint is chosen from the
 // node kind; a service additionally lists its environment variables.
 func loadDetailCmd(ctx context.Context, client explorerClient, node *treeNode) tea.Cmd {
-	uuid, kind, name := node.uuid, node.kind, node.label
+	uuid, kind, name, env := node.uuid, node.kind, node.label, node.key.Environment
 	return func() tea.Msg {
 		switch kind {
 		case resource.KindApplication:
@@ -51,7 +56,7 @@ func loadDetailCmd(ctx context.Context, client explorerClient, node *treeNode) t
 			if err != nil {
 				return errMsg{err}
 			}
-			return appDetailMsg{app}
+			return appDetailMsg{app: app, env: env, name: name}
 		case resource.KindDatabase:
 			db, err := client.GetDatabase(ctx, uuid)
 			if err != nil {

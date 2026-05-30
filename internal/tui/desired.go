@@ -53,3 +53,14 @@ func (m Model) desiredFor(env, name string) (config.ApplicationFile, bool) {
 	f, ok := m.desired[appKey{env: env, name: name}]
 	return f, ok
 }
+
+// attachDesired fills in an application detail's desired env-var section: the matched
+// config's env vars, or a note when no desired Application matches the selection.
+func (m Model) attachDesired(d *detail, env, name string) {
+	f, ok := m.desiredFor(env, name)
+	if !ok {
+		d.desiredNote = "no desired config for this application"
+		return
+	}
+	d.desiredEnvs = desiredEnvRows(f.Application.Spec.EnvVars)
+}

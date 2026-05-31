@@ -22,6 +22,14 @@ All notable changes to this project are documented here. The format is based on
   `config.WriteDatabase` marshaller mirrors `WriteApplication`, refusing to serialise a
   password that carries no `${env:}`/`${sops:}` declaration.
 
+### Fixed (explore)
+
+- In `explore`, `esc` (and `backspace`) now closes the active pane — the log pane, the drift
+  pane, or the detail panel, in that order — before falling through to collapsing the tree.
+  Previously `esc` while a pane was open collapsed the tree underneath it instead of closing
+  it, so the pane appeared stuck. A detail panel without a desired-env section (a database, for
+  instance) now also closes on `esc`, which it did not before.
+
 ### Fixed (resolver)
 
 - `explore`, `plan` and `apply` now resolve applications and services against a live Coolify

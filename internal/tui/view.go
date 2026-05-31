@@ -175,7 +175,7 @@ func renderDesiredSection(d *detail) string {
 
 func (m Model) renderLogs() string {
 	if len(m.logs) == 0 {
-		return dimStyle.Render("(no logs yet) — L to return")
+		return dimStyle.Render("(no logs yet) — esc/L to return")
 	}
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("logs"))

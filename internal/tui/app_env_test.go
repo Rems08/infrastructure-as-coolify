@@ -57,7 +57,7 @@ func TestLoadDetailCmd_AppFetchesRemoteEnvs(t *testing.T) {
 	}
 }
 
-// AC.E2a.1 — a failed env listing degrades gracefully: the detail still loads, the comparison is
+// A failed env listing degrades gracefully: the detail still loads, the comparison is
 // reported unavailable, and no error panel is raised.
 func TestAppDetail_RemoteEnvFailureDegradesGracefully(t *testing.T) {
 	fc := newFakeClient()
@@ -91,7 +91,7 @@ func TestAppDetail_RemoteEnvFailureDegradesGracefully(t *testing.T) {
 	}
 }
 
-// AC.E2a.2 — desired and remote are joined by presence: tracked, only-local, only-remote.
+// Desired and remote are joined by presence: tracked, only-local, only-remote.
 func TestAppEnvComparison_ByPresence(t *testing.T) {
 	m := appEnvModel(t)
 	m, _ = step(t, m, appDetailMsg{
@@ -117,7 +117,7 @@ func TestAppEnvComparison_ByPresence(t *testing.T) {
 	}
 }
 
-// AC.E2a.2 — remote values are masked until revealed; a desired secret is never resolved.
+// Remote values are masked until revealed; a desired secret is never resolved.
 func TestAppEnvComparison_RemoteMaskedSecretSafe(t *testing.T) {
 	m := appEnvModel(t)
 	m, _ = step(t, m, appDetailMsg{
@@ -150,7 +150,7 @@ func TestAppEnvComparison_RemoteMaskedSecretSafe(t *testing.T) {
 	}
 }
 
-// AC.E2a.2 — e edits the cursored desired row (the β flow is preserved) and the cursor never
+// e edits the cursored desired row (the edit flow is preserved) and the cursor never
 // reaches an only-remote row, which is read-only.
 func TestAppEnvComparison_EditDesiredOnlyRemoteReadOnly(t *testing.T) {
 	m := appEnvModel(t)

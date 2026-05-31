@@ -1,10 +1,33 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// HasManifests tells a populated directory (a known-kind resource) from an empty one and from
+// a directory holding only a bare root coolify.yaml (which carries no resource kind).
+func TestHasManifests(t *testing.T) {
+	if has, err := HasManifests(filepath.Join("..", "..", "examples", "minimal")); err != nil || !has {
+		t.Fatalf("HasManifests(minimal) = %v, %v; want true, nil", has, err)
+	}
+
+	empty := t.TempDir()
+	if has, err := HasManifests(empty); err != nil || has {
+		t.Fatalf("HasManifests(empty) = %v, %v; want false, nil", has, err)
+	}
+
+	rootOnly := t.TempDir()
+	root := []byte("api_version: " + "iac-coolify/v1" + "\nrequired_coolify: \">=4.0.0,<5.0.0\"\n")
+	if err := os.WriteFile(filepath.Join(rootOnly, "coolify.yaml"), root, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if has, err := HasManifests(rootOnly); err != nil || has {
+		t.Fatalf("HasManifests(root-only) = %v, %v; want false, nil", has, err)
+	}
+}
 
 // TestParseStrictRejectsUnknownFields asserts an unknown YAML field is rejected with its
 // name (and position), not silently ignored.

@@ -62,6 +62,18 @@ func Validate(target string, strict bool) (Report, error) {
 	return rep, nil
 }
 
+// HasManifests reports whether target (a file or directory) holds at least one known-kind
+// resource manifest. It is the detection callers use to tell an empty working directory from
+// a populated one — a bare root coolify.yaml carries no resource kind, so a directory holding
+// only that still reports false. A missing target surfaces as an error.
+func HasManifests(target string) (bool, error) {
+	files, err := collectFiles(target)
+	if err != nil {
+		return false, err
+	}
+	return len(files) > 0, nil
+}
+
 // collectFiles returns the YAML files to validate, each tagged with its kind. A file
 // target is returned as-is (its kind peeked); a directory is walked for known resource
 // kinds (other kinds, e.g. the project coolify.yaml, are skipped).

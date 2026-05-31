@@ -22,6 +22,18 @@ All notable changes to this project are documented here. The format is based on
   `config.WriteDatabase` marshaller mirrors `WriteApplication`, refusing to serialise a
   password that carries no `${env:}`/`${sops:}` declaration.
 
+### Added (explore)
+
+- An application detail now compares its desired env vars against the **live** ones. The two
+  sides are joined by name and summarised as `N tracked · N only-local · N only-remote`. The
+  comparison is by presence, not value (a desired value is often a `${env:…}` reference, not a
+  resolved value): a name on both sides is `tracked` and shows the live value beside the desired
+  one; a desired-only name is `only-local`; live vars with no desired counterpart are listed
+  read-only under **ENV VARS (only on remote)** as `only-remote` — what is left to capture as
+  IAC. Live values are masked until `r`, exactly like a service's. A failed live env listing
+  degrades gracefully: the fields and desired section still load and the comparison is reported
+  unavailable rather than failing the whole detail.
+
 ### Fixed (explore)
 
 - In `explore`, `esc` (and `backspace`) now closes the active pane — the log pane, the drift

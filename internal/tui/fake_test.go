@@ -33,9 +33,11 @@ type fakeClient struct {
 	app      coolify.Application
 	db       coolify.Database
 	svcEnvs  []coolify.ServiceEnvVar
+	appEnvs  []coolify.ServiceEnvVar
 
 	listProjectsErr error
 	getAppErr       error
+	appEnvsErr      error
 
 	// lifecycle records every mutating call so tests assert what was (or was not) invoked.
 	lifecycle    []string
@@ -124,4 +126,11 @@ func (f *fakeClient) GetDatabase(_ context.Context, uuid string) (coolify.Databa
 
 func (f *fakeClient) ListServiceEnvs(context.Context, string) ([]coolify.ServiceEnvVar, error) {
 	return f.svcEnvs, nil
+}
+
+func (f *fakeClient) ListApplicationEnvs(context.Context, string) ([]coolify.ServiceEnvVar, error) {
+	if f.appEnvsErr != nil {
+		return nil, f.appEnvsErr
+	}
+	return f.appEnvs, nil
 }

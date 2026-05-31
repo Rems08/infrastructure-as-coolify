@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"log/slog"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -14,14 +15,17 @@ import (
 // remote resolution completes.
 type resolvedMsg struct{ m state.Map }
 
-// appDetailMsg, dbDetailMsg and svcDetailMsg carry a fetched resource's detail. A service
-// also carries its environment variables (the only resource with a listable env set on the
-// read path); applications and databases expose their fields through the struct alone. An
-// application carries its (environment, name) coordinates so the update loop can match it to
-// the desired config without a second lookup of the selection.
+// appDetailMsg, dbDetailMsg and svcDetailMsg carry a fetched resource's detail. An application
+// and a service both carry their live environment variables; a database exposes its fields
+// through the struct alone. An application also carries its (environment, name) coordinates so
+// the update loop can match it to the desired config without a second lookup of the selection.
+// remoteErr marks a degraded load: the application's fields and desired config are still shown
+// when the env-var listing failed, with the comparison reported as unavailable.
 type appDetailMsg struct {
-	app       coolify.Application
-	env, name string
+	app        coolify.Application
+	env, name  string
+	remoteEnvs []coolify.ServiceEnvVar
+	remoteErr  bool
 }
 type dbDetailMsg struct{ db coolify.Database }
 type svcDetailMsg struct {
@@ -61,7 +65,14 @@ func loadDetailCmd(ctx context.Context, client explorerClient, node *treeNode) t
 			if err != nil {
 				return errMsg{err}
 			}
-			return appDetailMsg{app: app, env: env, name: name}
+			// A failed env listing degrades gracefully: the fields and desired config still load,
+			// only the desired↔remote comparison is reported unavailable.
+			envs, err := client.ListApplicationEnvs(ctx, uuid)
+			if err != nil {
+				slog.WarnContext(ctx, "application env list failed", "application", name, "error", err)
+				return appDetailMsg{app: app, env: env, name: name, remoteErr: true}
+			}
+			return appDetailMsg{app: app, env: env, name: name, remoteEnvs: envs}
 		case resource.KindDatabase:
 			db, err := client.GetDatabase(ctx, uuid)
 			if err != nil {

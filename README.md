@@ -410,6 +410,16 @@ when a config path is given and a desired Application matches by `(environment, 
 secret is shown only by its source declaration (`${env:…}`/`${sops:…}`) — its resolved value
 is never read or displayed. Databases show their structural fields only.
 
+An application's desired section is compared against its **live** env vars, joined by name and
+summarised in the header as `N tracked · N only-local · N only-remote`. The comparison is by
+**presence**, not value (a desired value is often a `${env:…}` reference, not a resolved value,
+so a value-to-value diff would be meaningless): a name found on both sides is `tracked` and
+shows the live value beside the desired one (masked until `r`); a desired name with no live
+counterpart is `only-local`. Live env vars with no desired counterpart — what is left to
+capture as IAC — are listed read-only under **ENV VARS (only on remote)** and tagged
+`only-remote`. If the live env listing fails, the fields and desired section still load and the
+comparison is reported as unavailable. Live values are masked by default like everything else.
+
 Press `D` on an application to see its **drift** — the per-field difference between the
 desired config and the live resource, matched by logical name. The drift view is read-only;
 secret fields are never shown in cleartext. It needs a config path; without one it says so.

@@ -118,6 +118,10 @@ func (m Model) renderDetail() string {
 		b.WriteString(sec)
 		b.WriteByte('\n')
 	}
+	if sec := renderRemoteOnlySection(d); sec != "" {
+		b.WriteString(sec)
+		b.WriteByte('\n')
+	}
 	if m.editing != nil {
 		fmt.Fprintf(&b, "\nedit %s: %s\n", m.editing.name, m.editing.input.View())
 		if m.editing.secret {
@@ -127,19 +131,26 @@ func (m Model) renderDetail() string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-// renderDesiredSection renders an application's desired env-var section: a note when no
-// desired config matched, or one row per env var (plain values masked until revealed, secret
-// values shown only by their source declaration). It returns "" when there is no section.
+// renderDesiredSection renders an application's desired env-var section: a header with the
+// desired↔remote comparison summary, a note when no desired config matched, or one row per env
+// var. Each row shows the desired value (plain masked until revealed, secret shown only by its
+// source declaration), the joined remote value (masked) and a presence status — tracked when
+// the name also exists remotely, only-local when it does not. It returns "" when there is no
+// section.
 func renderDesiredSection(d *detail) string {
 	if d.desiredNote == "" && !d.hasDesiredEnvs() {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(dimStyle.Render("─ env vars (desired) ─"))
+	b.WriteString(dimStyle.Render(desiredHeader(d)))
 	b.WriteByte('\n')
+	if d.remoteEnvErr {
+		b.WriteString(dimStyle.Render("remote env unavailable — showing desired only"))
+		b.WriteByte('\n')
+	}
 	if d.desiredNote != "" {
 		b.WriteString(dimStyle.Render(d.desiredNote))
-		return b.String()
+		return strings.TrimRight(b.String(), "\n")
 	}
 	dirty := false
 	for i, e := range d.desiredEnvs {
@@ -156,7 +167,16 @@ func renderDesiredSection(d *detail) string {
 		if e.secret {
 			lock = "🔒 "
 		}
-		fmt.Fprintf(&b, "%s%-22s %s%s%s\n", cursor, e.name, lock, d.renderDesiredValue(e), marker)
+		if d.remoteEnvErr {
+			fmt.Fprintf(&b, "%s%-22s %s%s%s\n", cursor, e.name, lock, d.renderDesiredValue(e), marker)
+			continue
+		}
+		remote, ok := d.remoteValue(e.name)
+		remoteCol, status := "−", dimStyle.Render("only-local")
+		if ok {
+			remoteCol, status = d.renderEnvValue(remote), statusStyle.Render("tracked")
+		}
+		fmt.Fprintf(&b, "%s%-20s %s%-22s %-22s %s%s\n", cursor, e.name, lock, d.renderDesiredValue(e), remoteCol, status, marker)
 	}
 	if dirty {
 		b.WriteString(updStyle.Render("● unsaved changes (s save · d discard)"))
@@ -169,6 +189,34 @@ func renderDesiredSection(d *detail) string {
 		} else {
 			b.WriteString(dimStyle.Render("  (r to reveal)"))
 		}
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// desiredHeader labels the desired section, appending the desired↔remote presence summary when
+// a remote listing is available.
+func desiredHeader(d *detail) string {
+	if d.remoteEnvErr {
+		return "─ env vars (desired) ─"
+	}
+	tracked, onlyLocal, onlyRemote := d.envComparison()
+	return fmt.Sprintf("─ env vars (desired) ─  %d tracked · %d only-local · %d only-remote",
+		tracked, onlyLocal, onlyRemote)
+}
+
+// renderRemoteOnlySection lists the live env vars with no desired counterpart: present on the
+// server, absent from the YAML. The rows are read-only (outside the edit cursor) — adopting one
+// into the desired config is out of scope here. It returns "" when every remote var is tracked.
+func renderRemoteOnlySection(d *detail) string {
+	only := d.onlyRemoteEnvs()
+	if len(only) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(dimStyle.Render("─ env vars (only on remote) ─"))
+	b.WriteByte('\n')
+	for _, e := range only {
+		fmt.Fprintf(&b, "  %-20s %-22s %s\n", e.key, d.renderEnvValue(e.value), addStyle.Render("only-remote"))
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

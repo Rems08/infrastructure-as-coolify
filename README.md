@@ -386,10 +386,17 @@ live state (drift) and to run application lifecycle actions behind a confirm pro
 
 ```bash
 export COOLIFY_API_URL=https://coolify.example.com
-export COOLIFY_API_TOKEN=...        # both required; explore has no offline mode
+export COOLIFY_API_TOKEN=...        # set both to skip the connection wizard
 iac-coolify explore                 # browse only
 iac-coolify explore ./coolify       # browse + drift against the config in ./coolify
 ```
+
+When no credentials are in the environment, `explore` opens a **connection wizard** instead of
+refusing to start: enter the Coolify URL, the API token, and an optional Cloudflare Access pair
+(Client ID + Secret). The token and the CF-Access secret are masked as you type, and `enter`
+tests the connection before opening the browser — a bad URL or token keeps the wizard open with
+the (redacted) error so you can fix it. The entered values are used for the session only: they
+are never written to disk and never logged. `esc` quits without connecting.
 
 When `explore` starts in a directory that holds no resource manifests, it opens an onboarding
 menu instead of an empty tree: `[S]ync` imports the live instance into local YAML (the same

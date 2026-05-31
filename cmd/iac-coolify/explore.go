@@ -48,13 +48,24 @@ func runExplore(parent context.Context, opts exploreOptions) error {
 	if isNonInteractive() {
 		return fmt.Errorf("explore requires an interactive terminal (not a pipe or CI)")
 	}
-	client, err := exploreClient(opts.coolifyURL)
-	if err != nil {
-		return err
-	}
 
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
+
+	client, online, err := buildClient(opts.coolifyURL)
+	if err != nil {
+		return err
+	}
+	if !online {
+		// No credentials in the environment: prompt for them instead of refusing.
+		client, err = connectInteractively(ctx)
+		if err != nil {
+			return err
+		}
+		if client == nil {
+			return nil // user quit the wizard before connecting
+		}
+	}
 
 	handler := tui.NewLogHandler(slog.LevelInfo)
 	prev := slog.Default()
@@ -85,8 +96,9 @@ func runExplore(parent context.Context, opts exploreOptions) error {
 	return err
 }
 
-// exploreClient builds a Coolify client and, unlike plan, refuses to run without
-// credentials: explore only browses the live instance, so there is no offline mode.
+// exploreClient builds a Coolify client and, unlike plan, refuses to run without credentials:
+// it backs the non-interactive import command, which has no terminal to prompt on. The
+// interactive explore command instead launches the credential wizard when offline.
 func exploreClient(flagURL string) (*coolify.Client, error) {
 	client, online, err := buildClient(flagURL)
 	if err != nil {

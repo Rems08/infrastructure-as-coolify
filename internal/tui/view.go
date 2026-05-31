@@ -103,9 +103,15 @@ func (m Model) renderDetail() string {
 		fmt.Fprintf(&b, "%-16s %s\n", f.label, f.value)
 	}
 	if d.hasEnvs() {
-		b.WriteString(dimStyle.Render("─ env vars ─"))
+		q := m.activeFilter()
+		rows := filterEnvRows(d.envs, q)
+		header := "─ env vars ─"
+		if q != "" {
+			header += fmt.Sprintf("  filter: %s (%d/%d)", q, len(rows), len(d.envs))
+		}
+		b.WriteString(dimStyle.Render(header))
 		b.WriteByte('\n')
-		for _, e := range d.envs {
+		for _, e := range rows {
 			fmt.Fprintf(&b, "%-32s %s%s\n", e.keyLabel(), d.renderEnvValue(e.value), conflictMark(e))
 		}
 		if d.revealed {
@@ -118,7 +124,7 @@ func (m Model) renderDetail() string {
 		b.WriteString(sec)
 		b.WriteByte('\n')
 	}
-	if sec := renderRemoteOnlySection(d); sec != "" {
+	if sec := m.renderRemoteOnlySection(); sec != "" {
 		b.WriteString(sec)
 		b.WriteByte('\n')
 	}
@@ -127,6 +133,10 @@ func (m Model) renderDetail() string {
 		if m.editing.secret {
 			b.WriteString(dimStyle.Render("keep a ${env:NAME} or ${sops:path} reference"))
 		}
+	}
+	if m.filtering != nil {
+		fmt.Fprintf(&b, "\nfilter env: %s\n", m.filtering.input.View())
+		b.WriteString(dimStyle.Render("↵ apply · esc cancel"))
 	}
 	return strings.TrimRight(b.String(), "\n")
 }
@@ -206,17 +216,46 @@ func desiredHeader(d *detail) string {
 
 // renderRemoteOnlySection lists the live env vars with no desired counterpart: present on the
 // server, absent from the YAML. The rows are read-only (outside the edit cursor) — adopting one
-// into the desired config is out of scope here. It returns "" when every remote var is tracked.
-func renderRemoteOnlySection(d *detail) string {
-	only := d.onlyRemoteEnvs()
-	if len(only) == 0 {
+// into the desired config is out of scope here. The active filter narrows the list by key and a
+// fixed window scrolls it, so a long list (dozens of uncaptured vars) stays readable. It
+// returns "" when every remote var is tracked.
+func (m Model) renderRemoteOnlySection() string {
+	d := m.detail
+	all := d.onlyRemoteEnvs()
+	if len(all) == 0 {
 		return ""
 	}
+	q := m.activeFilter()
+	rows := filterEnvRows(all, q)
+
 	var b strings.Builder
-	b.WriteString(dimStyle.Render("─ env vars (only on remote) ─"))
+	header := "─ env vars (only on remote) ─"
+	if q != "" {
+		header += fmt.Sprintf("  filter: %s (%d/%d)", q, len(rows), len(all))
+	}
+	b.WriteString(dimStyle.Render(header))
 	b.WriteByte('\n')
-	for _, e := range only {
+	if len(rows) == 0 {
+		b.WriteString(dimStyle.Render("  (no key matches the filter)"))
+		return strings.TrimRight(b.String(), "\n")
+	}
+
+	start := d.envScroll
+	if start > len(rows) {
+		start = len(rows)
+	}
+	end := start + envWindow
+	if end > len(rows) {
+		end = len(rows)
+	}
+	if start > 0 {
+		fmt.Fprintf(&b, "%s\n", dimStyle.Render(fmt.Sprintf("  ↑ %d more", start)))
+	}
+	for _, e := range rows[start:end] {
 		fmt.Fprintf(&b, "  %-32s %-22s %s%s\n", e.keyLabel(), d.renderEnvValue(e.value), addStyle.Render("only-remote"), conflictMark(e))
+	}
+	if end < len(rows) {
+		fmt.Fprintf(&b, "%s\n", dimStyle.Render(fmt.Sprintf("  ↓ %d more", len(rows)-end)))
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

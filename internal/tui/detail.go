@@ -94,6 +94,9 @@ type detail struct {
 	// desired config and to target an edit; envCursor selects the desired env row to edit.
 	env, name string
 	envCursor int
+	// envScroll is the first visible row of the only-remote list, advanced once the cursor has
+	// run past the editable desired rows so a long list stays navigable.
+	envScroll int
 }
 
 // hasEnvs reports whether the detail carries a live environment-variable table (services

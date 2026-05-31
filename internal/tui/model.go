@@ -33,6 +33,17 @@ type Model struct {
 	showLogs  bool
 	showDrift bool
 
+	// onboarding shows the no-manifests menu (sync/init/browse) instead of the tree; syncDir
+	// and syncURL are the import target and the URL recorded in the scaffold. syncing marks an
+	// import in flight; report holds the last import's rendered outcome and showReport displays
+	// it. They are only set when explore starts in a directory with no resource manifests.
+	onboarding bool
+	syncing    bool
+	syncDir    string
+	syncURL    string
+	report     string
+	showReport bool
+
 	// staged holds unsaved env-var edits keyed by application then var name. It is written by
 	// s and cleared on save or discard; hasPendingEdits drives the quit guard.
 	staged map[appKey]map[string]stagedEnv

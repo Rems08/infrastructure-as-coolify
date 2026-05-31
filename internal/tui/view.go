@@ -29,6 +29,10 @@ func (m Model) View() string {
 	b.WriteByte('\n')
 
 	switch {
+	case m.onboarding:
+		b.WriteString(m.renderOnboarding())
+	case m.showReport:
+		b.WriteString(m.renderReport())
 	case m.loading:
 		b.WriteString(dimStyle.Render("resolving live Coolify state…"))
 	case m.showDrift && m.drift != nil:
@@ -267,6 +271,38 @@ func conflictMark(e envRow) string {
 		return "  " + updStyle.Render("⚠ conflicting values")
 	}
 	return ""
+}
+
+// renderOnboarding draws the no-manifests menu, or a progress line while a sync runs.
+func (m Model) renderOnboarding() string {
+	var b strings.Builder
+	b.WriteString(dimStyle.Render("no local manifests found in " + m.syncDir))
+	b.WriteString("\n\n")
+	if m.syncing {
+		b.WriteString(statusStyle.Render("syncing… importing live resources into YAML"))
+		return b.String()
+	}
+	for _, line := range []struct{ key, rest string }{
+		{"[S]", "ync this instance to local YAML"},
+		{"[I]", "nit an empty scaffold"},
+		{"[B]", "rowse without local config"},
+		{"[Q]", "uit"},
+	} {
+		fmt.Fprintf(&b, "  %s%s\n", cursorStyle.Render(line.key), line.rest)
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// renderReport shows the last import's outcome (counts and the keys to populate), reusing the
+// importer's text rendering. It never prints a secret value.
+func (m Model) renderReport() string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("sync report"))
+	b.WriteByte('\n')
+	b.WriteString(strings.TrimRight(m.report, "\n"))
+	b.WriteByte('\n')
+	b.WriteString(dimStyle.Render("(esc to browse)"))
+	return b.String()
 }
 
 func (m Model) renderLogs() string {

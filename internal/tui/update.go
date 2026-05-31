@@ -143,8 +143,31 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case key.Matches(msg, m.keys.Reveal):
 		return m.toggleReveal()
+	case key.Matches(msg, m.keys.Back):
+		return m.handleBack(msg)
 	}
 	return m.handleNav(msg)
+}
+
+// handleBack closes the top-most open layer before touching the tree: the log pane, then the
+// drift pane, then the detail panel, and only otherwise falls through to tree navigation
+// (collapse). Without this an esc while a pane is open would collapse the tree underneath the
+// pane instead of closing it. confirm and edit modes capture esc earlier in handleKey, so
+// they never reach here.
+func (m Model) handleBack(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case m.showLogs:
+		m.showLogs = false
+	case m.showDrift:
+		// drift is refetched by toggleDrift on reopen, so clearing it here is safe.
+		m.showDrift = false
+		m.drift = nil
+	case m.detail != nil:
+		m.detail = nil
+	default:
+		return m.handleNav(msg)
+	}
+	return m, nil
 }
 
 // handleQuit quits immediately when clean; with unsaved edits it arms a confirmation instead,
@@ -188,8 +211,9 @@ func (m Model) handleNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleDesiredNav moves the cursor over an application's desired env rows, or returns focus
-// to the tree (back). Up/down clamp at the ends; open is a no-op (e edits the cursored row).
+// handleDesiredNav moves the cursor over an application's desired env rows. Up/down clamp at
+// the ends; open is a no-op (e edits the cursored row). Back closes the detail one level up in
+// handleBack, so it never reaches here.
 func (m Model) handleDesiredNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Up):
@@ -200,8 +224,6 @@ func (m Model) handleDesiredNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.detail.envCursor < len(m.detail.desiredEnvs)-1 {
 			m.detail.envCursor++
 		}
-	case key.Matches(msg, m.keys.Back):
-		m.detail = nil
 	}
 	return m, nil
 }

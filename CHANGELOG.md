@@ -24,6 +24,14 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added (explore)
 
+- `explore` now opens a **connection wizard** when no credentials are in the environment,
+  instead of refusing to start. It prompts for the Coolify URL, the API token, and an optional
+  Cloudflare Access pair; the token and CF-Access secret are masked on screen. Submitting tests
+  the connection with a light read before opening the browser, keeping the form open with a
+  redacted error on failure. The entered values are sourced as `${env:}` secrets (set in the
+  process environment, then built through the same path as `COOLIFY_API_TOKEN`) — never a
+  hardcoded secret — and are session-only: never written to disk, never logged. Credentials
+  already in the environment skip the wizard unchanged.
 - An application detail now compares its desired env vars against the **live** ones. The two
   sides are joined by name and summarised as `N tracked · N only-local · N only-remote`. The
   comparison is by presence, not value (a desired value is often a `${env:…}` reference, not a

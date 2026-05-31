@@ -22,9 +22,40 @@ type field struct {
 // already returns (coolify.ServiceEnvVar.Value is a plain string, never an opaque Secret);
 // masking it is a view concern, so the row holds the cleartext and the view decides
 // whether to show it.
+//
+// scope is the buildtime/runtime label from the live API ("build", "runtime" or
+// "build,runtime"), empty for a desired row or when the API set no scope flag. conflict marks
+// a row whose collapsed (key, scope) duplicates carried differing values, so the view can flag
+// the inconsistency without exposing either value.
 type envRow struct {
-	key   string
-	value string
+	key      string
+	value    string
+	scope    string
+	conflict bool
+}
+
+// keyLabel renders the row's key with its scope tag appended ("KEY [build,runtime]"), or the
+// bare key when the row has no scope.
+func (e envRow) keyLabel() string {
+	if e.scope == "" {
+		return e.key
+	}
+	return e.key + " [" + e.scope + "]"
+}
+
+// envScope renders a live env var's buildtime/runtime scope as a compact label, or "" when the
+// API set neither flag.
+func envScope(e coolify.ServiceEnvVar) string {
+	switch {
+	case e.IsBuildtime && e.IsRuntime:
+		return "build,runtime"
+	case e.IsBuildtime:
+		return "build"
+	case e.IsRuntime:
+		return "runtime"
+	default:
+		return ""
+	}
 }
 
 // desiredEnvRow is one environment variable from the desired YAML config. It is leak-proof
@@ -63,6 +94,9 @@ type detail struct {
 	// desired config and to target an edit; envCursor selects the desired env row to edit.
 	env, name string
 	envCursor int
+	// envScroll is the first visible row of the only-remote list, advanced once the cursor has
+	// run past the editable desired rows so a long list stays navigable.
+	envScroll int
 }
 
 // hasEnvs reports whether the detail carries a live environment-variable table (services
@@ -133,7 +167,16 @@ func (d detail) envComparison() (tracked, onlyLocal, onlyRemote int) {
 			onlyLocal++
 		}
 	}
-	return tracked, onlyLocal, len(d.onlyRemoteEnvs())
+	// only-remote is counted by unique key: a key present on the remote in both scopes is one
+	// uncaptured var, even though it renders as two scoped rows.
+	seen := map[string]struct{}{}
+	for _, e := range d.onlyRemoteEnvs() {
+		if _, ok := seen[e.key]; !ok {
+			seen[e.key] = struct{}{}
+			onlyRemote++
+		}
+	}
+	return tracked, onlyLocal, onlyRemote
 }
 
 // renderEnvValue returns what the view prints for a live env value: the mask unless the user
@@ -229,12 +272,25 @@ func serviceDetail(name string, envs []coolify.ServiceEnvVar) detail {
 	}
 }
 
-// envRows projects live env vars into display rows. The wire value is plain text (Secret is
-// never populated from a response); masking it is a view concern handled by renderEnvValue.
+// envRows projects live env vars into display rows, collapsing the exact (key, scope)
+// duplicates the API returns while keeping genuine scope variants (the same key as a build
+// entry and a runtime entry) as distinct rows. When collapsed duplicates disagree on the
+// value the kept row is flagged conflict. The wire value is plain text (Secret is never
+// populated from a response); masking it is a view concern handled by renderEnvValue.
 func envRows(envs []coolify.ServiceEnvVar) []envRow {
 	rows := make([]envRow, 0, len(envs))
+	seen := make(map[string]int, len(envs))
 	for _, e := range envs {
-		rows = append(rows, envRow{key: e.Key, value: e.Value})
+		scope := envScope(e)
+		id := e.Key + "\x00" + scope
+		if i, ok := seen[id]; ok {
+			if rows[i].value != e.Value {
+				rows[i].conflict = true
+			}
+			continue
+		}
+		seen[id] = len(rows)
+		rows = append(rows, envRow{key: e.Key, value: e.Value, scope: scope})
 	}
 	return rows
 }

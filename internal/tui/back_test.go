@@ -95,7 +95,7 @@ func TestHandleBack_EscCollapsesTreeWhenNothingOpen(t *testing.T) {
 }
 
 // Desired-env up/down still moves the cursor after the Back case was removed from
-// handleDesiredNav, and esc closes the detail rather than being swallowed by the env nav.
+// handleEnvNav, and esc closes the detail rather than being swallowed by the env nav.
 func TestHandleBack_DesiredCursorStillMovesThenEscCloses(t *testing.T) {
 	m := newTestModel(t)
 	m.detail = &detail{

@@ -231,10 +231,21 @@ type UpdateServiceRequest struct {
 // ServiceEnvVar is a service environment variable. When Secret is set it is revealed at
 // the HTTP boundary in place of Value, so a sensitive value never has to be carried as a
 // plain string by the caller.
+//
+// IsBuildtime and IsRuntime are the scope flags the API attaches to a stored env var. The
+// same key can appear once per scope (a build-only entry and a runtime-only entry), so two
+// rows sharing a key but differing in scope are distinct variants, not duplicates. Both flags
+// are read from the live response: the pinned OpenAPI documents the env response without them,
+// so they cannot be relied on from the spec alone. The scope flags are never sent on a write
+// (envWire carries key and value only).
 type ServiceEnvVar struct {
-	UUID   string         `json:"uuid,omitempty"`
-	Key    string         `json:"key"`
-	Value  string         `json:"value"`
+	UUID        string `json:"uuid,omitempty"`
+	Key         string `json:"key"`
+	Value       string `json:"value"`
+	IsBuildtime bool   `json:"is_buildtime"`
+	IsRuntime   bool   `json:"is_runtime"`
+	IsPreview   bool   `json:"is_preview"`
+
 	Secret secrets.Secret `json:"-"`
 }
 

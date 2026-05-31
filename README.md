@@ -400,6 +400,7 @@ iac-coolify explore ./coolify       # browse + drift against the config in ./coo
 | `D`        | drift: compare the selected application against its config |
 | `R`/`S`/`U` | restart / stop / start the selected application (asks `[y/N]`) |
 | `e`/`s`/`d` | edit the selected desired env var / save edits to YAML / discard them |
+| `/`        | filter env vars by key (`esc` clears the filter)  |
 | `L`        | toggle the log pane                               |
 | `q`/`ctrl+c` | quit                                            |
 
@@ -419,6 +420,16 @@ counterpart is `only-local`. Live env vars with no desired counterpart — what 
 capture as IAC — are listed read-only under **ENV VARS (only on remote)** and tagged
 `only-remote`. If the live env listing fails, the fields and desired section still load and the
 comparison is reported as unavailable. Live values are masked by default like everything else.
+
+Coolify scopes each live env var as buildtime, runtime, or both, so rows carry a scope tag
+(`KEY [build]`, `KEY [runtime]`, `KEY [build,runtime]`). The same key in two scopes is a genuine
+variant and is kept as two rows; exact `(key, scope)` duplicates are collapsed, and a collapsed
+pair that disagreed on its value is flagged `⚠ conflicting values` (the value itself is never
+shown). The only-remote presence count is by unique key, so a key present in both scopes counts
+once. Press `/` to filter the env lists by a key substring (case-insensitive — keys only, never
+values); the header shows `filter: <query> (matched/total)` and `esc` clears it. A long
+only-remote list scrolls within a fixed window with `↑ N more`/`↓ N more` markers: `↓`/`j` runs
+the cursor through the editable desired rows and then scrolls the list, `↑`/`k` scrolls back.
 
 Press `D` on an application to see its **drift** — the per-field difference between the
 desired config and the live resource, matched by logical name. The drift view is read-only;

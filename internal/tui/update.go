@@ -123,9 +123,20 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.editing != nil {
 		return m.handleEdit(msg)
 	}
+	if m.filtering != nil {
+		return m.handleFilter(msg)
+	}
+	return m.handleAction(msg)
+}
+
+// handleAction dispatches a key press once the modal captures (confirm/edit/filter) have been
+// ruled out: an action binding, otherwise tree/env navigation.
+func (m Model) handleAction(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		return m.handleQuit()
+	case key.Matches(msg, m.keys.Filter):
+		return m.startFilter()
 	case key.Matches(msg, m.keys.Edit):
 		return m.startEdit()
 	case key.Matches(msg, m.keys.Save):
@@ -151,13 +162,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.handleNav(msg)
 }
 
-// handleBack closes the top-most open layer before touching the tree: the log pane, then the
-// drift pane, then the detail panel, and only otherwise falls through to tree navigation
-// (collapse). Without this an esc while a pane is open would collapse the tree underneath the
-// pane instead of closing it. confirm and edit modes capture esc earlier in handleKey, so
-// they never reach here.
+// handleBack closes the top-most open layer before touching the tree: an applied env filter
+// first, then the log pane, the drift pane, the detail panel, and only otherwise falls through
+// to tree navigation (collapse). Without this an esc while a pane is open would collapse the
+// tree underneath the pane instead of closing it. confirm, edit and filter-input modes capture
+// esc earlier in handleKey, so they never reach here.
 func (m Model) handleBack(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
+	case m.filter != "":
+		m.filter = ""
+		m.clampEnvScroll()
 	case m.showLogs:
 		m.showLogs = false
 	case m.showDrift:
@@ -191,11 +205,11 @@ func (m Model) toggleReveal() (tea.Model, tea.Cmd) {
 }
 
 // handleNav applies the tree-navigation keys (up/down/back/open). When an application detail
-// with desired env rows is open, focus moves into that list instead, so up/down select the
-// row to edit and back returns focus to the tree.
+// with env rows is open, focus moves into that list instead, so up/down select the desired row
+// to edit and then scroll the only-remote list, and back returns focus to the tree.
 func (m Model) handleNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.detail != nil && m.detail.hasDesiredEnvs() {
-		return m.handleDesiredNav(msg)
+	if m.detail != nil && (m.detail.hasDesiredEnvs() || len(m.detail.remoteEnvs) > 0) {
+		return m.handleEnvNav(msg)
 	}
 	switch {
 	case key.Matches(msg, m.keys.Up):
@@ -213,18 +227,24 @@ func (m Model) handleNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleDesiredNav moves the cursor over an application's desired env rows. Up/down clamp at
-// the ends; open is a no-op (e edits the cursored row). Back closes the detail one level up in
+// handleEnvNav moves through an application's env rows: the cursor runs over the editable
+// desired rows first, then down continues by scrolling the read-only only-remote list (and up
+// scrolls it back before moving the cursor). The cursor never enters the only-remote list, so
+// e only ever edits a desired row. Open is a no-op; back closes the detail one level up in
 // handleBack, so it never reaches here.
-func (m Model) handleDesiredNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleEnvNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Up):
-		if m.detail.envCursor > 0 {
+		if m.detail.envScroll > 0 {
+			m.detail.envScroll--
+		} else if m.detail.envCursor > 0 {
 			m.detail.envCursor--
 		}
 	case key.Matches(msg, m.keys.Down):
 		if m.detail.envCursor < len(m.detail.desiredEnvs)-1 {
 			m.detail.envCursor++
+		} else if m.detail.envScroll < m.detail.maxEnvScroll(m.activeFilter()) {
+			m.detail.envScroll++
 		}
 	}
 	return m, nil

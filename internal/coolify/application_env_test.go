@@ -23,6 +23,38 @@ func TestListApplicationEnvs(t *testing.T) {
 	}
 }
 
+func TestListApplicationEnvsDecodesScope(t *testing.T) {
+	// The live response carries is_buildtime/is_runtime/is_preview per entry, and returns the
+	// same key once per scope. The fixture mirrors that shape (not the pinned spec, which omits
+	// the scope flags).
+	body := `[
+		{"uuid":"e1","key":"NODE_ENV","value":"prod","is_buildtime":true,"is_runtime":true,"is_preview":false},
+		{"uuid":"e2","key":"GIT_SHA","value":"abc","is_buildtime":true,"is_runtime":false},
+		{"uuid":"e3","key":"GIT_SHA","value":"abc","is_buildtime":false,"is_runtime":true}
+	]`
+	srv, _ := captureServer(t, http.StatusOK, body)
+	envs, err := newTestClient(t, srv.URL).ListApplicationEnvs(context.Background(), "app-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(envs) != 3 {
+		t.Fatalf("list = %d entries, want 3 (same-key scope variants both kept)", len(envs))
+	}
+	if !envs[0].IsBuildtime || !envs[0].IsRuntime {
+		t.Errorf("NODE_ENV scope = build:%v runtime:%v, want both true", envs[0].IsBuildtime, envs[0].IsRuntime)
+	}
+	if !envs[1].IsBuildtime || envs[1].IsRuntime {
+		t.Errorf("GIT_SHA build variant = build:%v runtime:%v, want build-only", envs[1].IsBuildtime, envs[1].IsRuntime)
+	}
+	if envs[2].IsBuildtime || !envs[2].IsRuntime {
+		t.Errorf("GIT_SHA runtime variant = build:%v runtime:%v, want runtime-only", envs[2].IsBuildtime, envs[2].IsRuntime)
+	}
+	// The value stays a plain maskable string on read; Secret is never populated from a response.
+	if envs[0].Value != "prod" || !envs[0].Secret.IsZero() {
+		t.Errorf("value/secret = %q/%v, want plain prod and zero secret", envs[0].Value, envs[0].Secret)
+	}
+}
+
 func TestBulkUpdateApplicationEnvsRevealsSecretAtBoundary(t *testing.T) {
 	srv, got := captureServer(t, http.StatusCreated, `[]`)
 	t.Setenv("DB_PASS", "s3cr3t-value")

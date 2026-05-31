@@ -25,7 +25,9 @@ type Model struct {
 	tree      tree
 	detail    *detail
 	confirm   *confirmState
-	editing   *editState // active env-var edit; while set, every key routes to the textinput.
+	editing   *editState   // active env-var edit; while set, every key routes to the textinput.
+	filtering *filterState // open env-key filter input; while set, every key routes to it.
+	filter    string       // applied env-key filter; empty shows every row.
 	drift     *driftView
 	logs      []LogMsg
 	showLogs  bool

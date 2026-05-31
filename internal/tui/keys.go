@@ -17,6 +17,7 @@ type keyMap struct {
 	Edit    key.Binding
 	Save    key.Binding
 	Discard key.Binding
+	Filter  key.Binding
 	Quit    key.Binding
 }
 
@@ -35,6 +36,7 @@ func defaultKeys() keyMap {
 		Edit:    key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit env")),
 		Save:    key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "save")),
 		Discard: key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "discard")),
+		Filter:  key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter env")),
 		Quit:    key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 	}
 }
@@ -49,7 +51,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Open, k.Back},
 		{k.Drift, k.Restart, k.Stop, k.Start},
-		{k.Edit, k.Save, k.Discard},
+		{k.Edit, k.Save, k.Discard, k.Filter},
 		{k.Reveal, k.Logs, k.Quit},
 	}
 }

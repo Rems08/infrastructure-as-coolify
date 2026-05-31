@@ -33,6 +33,15 @@ All notable changes to this project are documented here. The format is based on
   IAC. Live values are masked until `r`, exactly like a service's. A failed live env listing
   degrades gracefully: the fields and desired section still load and the comparison is reported
   unavailable rather than failing the whole detail.
+- Live env vars now carry their Coolify **scope** (buildtime/runtime), decoded from the live
+  response. Rows are tagged `KEY [build]`/`KEY [runtime]`/`KEY [build,runtime]`; the same key in
+  two scopes is kept as distinct variants while exact `(key, scope)` duplicates the API returns
+  are collapsed, and a collapsed pair disagreeing on its value is flagged `⚠ conflicting values`
+  without exposing it. The only-remote count is by unique key.
+- `/` filters the env lists by a key substring (case-insensitive, keys only) with a
+  `matched/total` indicator; `esc` clears it. A long only-remote list scrolls within a fixed
+  window with `↑/↓ more` markers, so an application with dozens of uncaptured vars stays
+  readable.
 
 ### Fixed (explore)
 

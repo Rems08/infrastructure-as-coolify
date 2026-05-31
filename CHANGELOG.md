@@ -42,6 +42,14 @@ All notable changes to this project are documented here. The format is based on
   `matched/total` indicator; `esc` clears it. A long only-remote list scrolls within a fixed
   window with `↑/↓ more` markers, so an application with dozens of uncaptured vars stays
   readable.
+- Starting `explore` in a directory with no resource manifests now opens an onboarding menu
+  rather than an empty tree: `[S]ync` imports the live instance into local YAML (reusing the
+  `import` engine, so it writes `${env:…}` references and prints a report), `[I]nit` scaffolds
+  an empty root `coolify.yaml`, `[B]rowse` opens the live tree without local config, and `[Q]uit`
+  exits. A finished sync loads the desired config immediately so drift works in the same session;
+  syncing over existing manifests asks before overwriting. `importer.ScaffoldRoot` and a typed
+  `importer.ErrManifestsExist` back the init and the overwrite prompt; `config.HasManifests`
+  drives the detection.
 
 ### Fixed (explore)
 

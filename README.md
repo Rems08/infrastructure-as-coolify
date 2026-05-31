@@ -395,7 +395,7 @@ iac-coolify explore ./coolify       # browse + drift against the config in ./coo
 |------------|---------------------------------------------------|
 | `↑`/`↓` `k`/`j` | move the cursor                              |
 | `↵`        | expand/collapse a container, or open a resource   |
-| `esc`/`backspace` | collapse, or jump to the parent            |
+| `esc`/`backspace` | close the active pane (logs, drift, detail), else collapse or jump to the parent |
 | `r`        | reveal/hide masked environment-variable values    |
 | `D`        | drift: compare the selected application against its config |
 | `R`/`S`/`U` | restart / stop / start the selected application (asks `[y/N]`) |

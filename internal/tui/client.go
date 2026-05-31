@@ -23,6 +23,7 @@ type explorerClient interface {
 	GetApplication(ctx context.Context, uuid string) (coolify.Application, error)
 	GetDatabase(ctx context.Context, uuid string) (coolify.Database, error)
 	ListServiceEnvs(ctx context.Context, serviceUUID string) ([]coolify.ServiceEnvVar, error)
+	ListApplicationEnvs(ctx context.Context, appUUID string) ([]coolify.ServiceEnvVar, error)
 }
 
 // mutatorClient is the write subset the browser needs for lifecycle actions. It is kept

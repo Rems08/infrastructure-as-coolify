@@ -79,6 +79,8 @@ func (m Model) handleDetailMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case appDetailMsg:
 		d := applicationDetail(msg.app)
 		m.attachDesired(&d, msg.env, msg.name)
+		d.remoteEnvs = envRows(msg.remoteEnvs)
+		d.remoteEnvErr = msg.remoteErr
 		m.detail = &d
 	case dbDetailMsg:
 		m.detail = ptr(databaseDetail(msg.db))

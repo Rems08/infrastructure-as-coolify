@@ -48,8 +48,13 @@ type detail struct {
 	fields      []field
 	envs        []envRow
 	desiredEnvs []desiredEnvRow
-	desiredNote string
-	revealed    bool
+	// remoteEnvs are an application's live env vars, joined to desiredEnvs by name for the
+	// desired↔remote comparison. remoteEnvErr marks a failed listing: the comparison is then
+	// reported unavailable instead of misreporting every desired var as only-local.
+	remoteEnvs   []envRow
+	remoteEnvErr bool
+	desiredNote  string
+	revealed     bool
 	// loading marks a placeholder shown while a leaf's detail is fetched, so an error or a
 	// kind with no detail endpoint can clear it instead of leaving it stuck.
 	loading bool
@@ -68,10 +73,10 @@ func (d detail) hasEnvs() bool { return len(d.envs) > 0 }
 func (d detail) hasDesiredEnvs() bool { return len(d.desiredEnvs) > 0 }
 
 // hasMaskableValues reports whether the reveal toggle has anything to act on: a service's
-// live env table, or a plain (non-secret) desired value. Secret desired rows show only their
-// source declaration, so reveal never affects them.
+// live env table, an application's remote env values, or a plain (non-secret) desired value.
+// Secret desired rows show only their source declaration, so reveal never affects them.
 func (d detail) hasMaskableValues() bool {
-	if d.hasEnvs() {
+	if d.hasEnvs() || len(d.remoteEnvs) > 0 {
 		return true
 	}
 	for _, e := range d.desiredEnvs {
@@ -80,6 +85,55 @@ func (d detail) hasMaskableValues() bool {
 		}
 	}
 	return false
+}
+
+// remoteValue returns the application's live value for a desired env name, and whether that
+// name exists on the remote at all (a desired var absent here is only-local).
+func (d detail) remoteValue(name string) (string, bool) {
+	for _, e := range d.remoteEnvs {
+		if e.key == name {
+			return e.value, true
+		}
+	}
+	return "", false
+}
+
+// onlyRemoteEnvs returns the live env vars with no desired counterpart: keys present on the
+// server but absent from the YAML — what is left to capture as IAC. Order follows the remote
+// listing.
+func (d detail) onlyRemoteEnvs() []envRow {
+	if len(d.remoteEnvs) == 0 {
+		return nil
+	}
+	desired := d.desiredNameSet()
+	var out []envRow
+	for _, e := range d.remoteEnvs {
+		if _, ok := desired[e.key]; !ok {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func (d detail) desiredNameSet() map[string]struct{} {
+	s := make(map[string]struct{}, len(d.desiredEnvs))
+	for _, e := range d.desiredEnvs {
+		s[e.name] = struct{}{}
+	}
+	return s
+}
+
+// envComparison counts the desired↔remote join by presence (never by value: a desired value is
+// often a ${env:…} reference, not a resolved value, so a value diff would be meaningless).
+func (d detail) envComparison() (tracked, onlyLocal, onlyRemote int) {
+	for _, e := range d.desiredEnvs {
+		if _, ok := d.remoteValue(e.name); ok {
+			tracked++
+		} else {
+			onlyLocal++
+		}
+	}
+	return tracked, onlyLocal, len(d.onlyRemoteEnvs())
 }
 
 // renderEnvValue returns what the view prints for a live env value: the mask unless the user
@@ -168,15 +222,21 @@ func databaseDetail(db coolify.Database) detail {
 }
 
 func serviceDetail(name string, envs []coolify.ServiceEnvVar) detail {
+	return detail{
+		kind:  resource.KindService,
+		title: name,
+		envs:  envRows(envs),
+	}
+}
+
+// envRows projects live env vars into display rows. The wire value is plain text (Secret is
+// never populated from a response); masking it is a view concern handled by renderEnvValue.
+func envRows(envs []coolify.ServiceEnvVar) []envRow {
 	rows := make([]envRow, 0, len(envs))
 	for _, e := range envs {
 		rows = append(rows, envRow{key: e.Key, value: e.Value})
 	}
-	return detail{
-		kind:  resource.KindService,
-		title: name,
-		envs:  rows,
-	}
+	return rows
 }
 
 // placeholder describes a leaf that has been selected but whose detail has not arrived yet.

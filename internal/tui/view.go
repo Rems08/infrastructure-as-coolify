@@ -106,7 +106,7 @@ func (m Model) renderDetail() string {
 		b.WriteString(dimStyle.Render("─ env vars ─"))
 		b.WriteByte('\n')
 		for _, e := range d.envs {
-			fmt.Fprintf(&b, "%-22s %s\n", e.key, d.renderEnvValue(e.value))
+			fmt.Fprintf(&b, "%-32s %s%s\n", e.keyLabel(), d.renderEnvValue(e.value), conflictMark(e))
 		}
 		if d.revealed {
 			b.WriteString(revealedStyle.Render("⚠ values revealed (r to hide)"))
@@ -216,9 +216,18 @@ func renderRemoteOnlySection(d *detail) string {
 	b.WriteString(dimStyle.Render("─ env vars (only on remote) ─"))
 	b.WriteByte('\n')
 	for _, e := range only {
-		fmt.Fprintf(&b, "  %-20s %-22s %s\n", e.key, d.renderEnvValue(e.value), addStyle.Render("only-remote"))
+		fmt.Fprintf(&b, "  %-32s %-22s %s%s\n", e.keyLabel(), d.renderEnvValue(e.value), addStyle.Render("only-remote"), conflictMark(e))
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// conflictMark flags a row whose collapsed (key, scope) duplicates disagreed on the value. It
+// names the inconsistency without printing either value, so it stays leak-safe even revealed.
+func conflictMark(e envRow) string {
+	if e.conflict {
+		return "  " + updStyle.Render("⚠ conflicting values")
+	}
+	return ""
 }
 
 func (m Model) renderLogs() string {

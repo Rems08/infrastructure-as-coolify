@@ -391,6 +391,14 @@ iac-coolify explore                 # browse only
 iac-coolify explore ./coolify       # browse + drift against the config in ./coolify
 ```
 
+When `explore` starts in a directory that holds no resource manifests, it opens an onboarding
+menu instead of an empty tree: `[S]ync` imports the live instance into local YAML (the same
+reverse-engineering as `iac-coolify import`, writing `${env:…}` references — never secret
+values — and printing a report), `[I]nit` scaffolds an empty root `coolify.yaml`, `[B]rowse`
+opens the live tree without any local config, and `[Q]uit` exits. After a sync the desired
+config is loaded straight away, so drift and the desired comparison work in the same session;
+if manifests already exist a sync asks before overwriting them (`[y/N]`).
+
 | Key        | Action                                            |
 |------------|---------------------------------------------------|
 | `↑`/`↓` `k`/`j` | move the cursor                              |

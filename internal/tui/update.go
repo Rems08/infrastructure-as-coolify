@@ -45,6 +45,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case mutationDoneMsg:
 		return m.applyMutationDone(msg)
+	case syncDoneMsg:
+		return m.applySyncDone(msg)
+	case initDoneMsg:
+		return m.applyInitDone(msg)
 	case errMsg:
 		m.err = msg.err
 		m.loading = false
@@ -126,6 +130,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.filtering != nil {
 		return m.handleFilter(msg)
 	}
+	if m.onboarding {
+		return m.handleOnboarding(msg)
+	}
 	return m.handleAction(msg)
 }
 
@@ -163,7 +170,7 @@ func (m Model) handleAction(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleBack closes the top-most open layer before touching the tree: an applied env filter
-// first, then the log pane, the drift pane, the detail panel, and only otherwise falls through
+// first, then the sync report, the log pane, the drift pane, the detail panel, and only otherwise falls through
 // to tree navigation (collapse). Without this an esc while a pane is open would collapse the
 // tree underneath the pane instead of closing it. confirm, edit and filter-input modes capture
 // esc earlier in handleKey, so they never reach here.
@@ -172,6 +179,8 @@ func (m Model) handleBack(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case m.filter != "":
 		m.filter = ""
 		m.clampEnvScroll()
+	case m.showReport:
+		m.showReport = false
 	case m.showLogs:
 		m.showLogs = false
 	case m.showDrift:

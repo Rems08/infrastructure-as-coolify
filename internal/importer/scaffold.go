@@ -1,7 +1,9 @@
 package importer
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,6 +16,11 @@ import (
 // requiredCoolify is the Coolify version constraint written into the scaffolded root
 // manifest, matching the constraint the bundled examples declare.
 const requiredCoolify = ">=4.0.0,<5.0.0"
+
+// ErrManifestsExist is returned by Run when one or more target manifests already exist and
+// Force is false. Callers test for it (errors.Is) to offer an overwrite rather than parsing
+// the message.
+var ErrManifestsExist = errors.New("manifests already exist")
 
 // plannedFile is one manifest the import will write: its absolute target path and the
 // closure that serialises it. Collecting the closures lets the import detect every conflict
@@ -71,6 +78,23 @@ func writeRootManifest(path, apiURL string) error {
 	return os.WriteFile(path, []byte(b.String()), 0o600)
 }
 
+// ScaffoldRoot writes the project root coolify.yaml under dir if it is absent, recording
+// apiURL, and reports whether it wrote. An existing root is left untouched (wrote is false),
+// so re-running over a populated directory is a no-op rather than an overwrite.
+func ScaffoldRoot(dir, apiURL string) (bool, error) {
+	path := rootManifestPath(dir)
+	switch _, err := os.Stat(path); {
+	case err == nil:
+		return false, nil
+	case !errors.Is(err, fs.ErrNotExist):
+		return false, fmt.Errorf("stat %s: %w", path, err)
+	}
+	if err := writeRootManifest(path, apiURL); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // commitFiles writes every planned file, unless one already exists and force is false: in
 // that case it refuses with an error listing all collisions and writes nothing, so an import
 // is all-or-nothing. With force, existing files are overwritten. Parent directories are
@@ -79,8 +103,8 @@ func commitFiles(files []plannedFile, force bool) error {
 	if !force {
 		if collisions := existingPaths(files); len(collisions) > 0 {
 			return fmt.Errorf(
-				"refusing to overwrite %d existing file(s) (use --force to overwrite):\n  %s",
-				len(collisions), strings.Join(collisions, "\n  "),
+				"%w: refusing to overwrite %d existing file(s) (use --force to overwrite):\n  %s",
+				ErrManifestsExist, len(collisions), strings.Join(collisions, "\n  "),
 			)
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Rems08/infrastructure-as-coolify/internal/apply"
+	"github.com/Rems08/infrastructure-as-coolify/internal/config"
 	"github.com/Rems08/infrastructure-as-coolify/internal/coolify"
 	"github.com/Rems08/infrastructure-as-coolify/internal/tui"
 )
@@ -60,10 +61,23 @@ func runExplore(parent context.Context, opts exploreOptions) error {
 	slog.SetDefault(slog.New(handler))
 	defer slog.SetDefault(prev)
 
-	model := tui.NewModel(ctx, client, client,
+	modelOpts := []tui.Option{
 		tui.WithConfigPath(opts.configPath),
 		tui.WithAuditor(apply.NewAuditor(opts.auditLog)),
-	)
+	}
+	dir := opts.configPath
+	if dir == "" {
+		dir = "."
+	}
+	has, err := config.HasManifests(dir)
+	if err != nil {
+		return err
+	}
+	if !has {
+		modelOpts = append(modelOpts, tui.WithOnboarding(dir, coolifyURL(opts.coolifyURL)))
+	}
+
+	model := tui.NewModel(ctx, client, client, modelOpts...)
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithContext(ctx))
 	handler.Wire(p.Send)
 

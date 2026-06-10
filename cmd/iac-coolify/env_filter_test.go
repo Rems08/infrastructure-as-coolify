@@ -149,6 +149,47 @@ func TestApply_TargetEnvComposition(t *testing.T) {
 	wantExit2(t, out, err, "no resources match --target=back-office --env=production")
 }
 
+// appManifestWithEnv is appManifest plus a single ${env:} reference, to exercise the
+// secret-resolution path that only apply walks.
+func appManifestWithEnv(name, project, env, ref string) string {
+	return appManifest(name, project, env) +
+		"  env_vars:\n" +
+		"  - name: " + ref + "\n" +
+		"    value: ${env:" + ref + "}\n"
+}
+
+// A scoped apply must only resolve the env vars of the resources it actually touches: the
+// filters now run before ResolveSecrets, so an unset var on a non-targeted app no longer
+// fails the run. Regression for the V1 CI apply that tripped on another app's NUXT var.
+func TestApply_ScopedApply_IgnoresOtherResourcesEnvVars(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"project.yaml":  projectManifest("beenaire"),
+		"env-prod.yaml": envManifest("production", "beenaire"),
+		"app-api.yaml":  appManifest("api", "beenaire", "production"),
+		"app-other.yaml": appManifestWithEnv("other", "beenaire", "production",
+			"UNSET_ONLY_FOR_OTHER"),
+	}
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Targeting api must succeed even though "other" references an unset env var.
+	if got := applyDryRun(t, dir, "--target", "api", "--env", "production"); got.ToAdd != 1 {
+		t.Errorf("--target api to_add = %d, want 1 (other's unset var must not matter)", got.ToAdd)
+	}
+	// Sanity: without the filter, the unset var on "other" still fails loudly.
+	clearCoolifyEnv(t)
+	out, err := runCmd(t, "apply", dir, "--dry-run", "--output=json")
+	if err == nil {
+		t.Fatalf("unfiltered apply should fail on the unset var, got success:\n%s", out)
+	}
+	if !strings.Contains(err.Error()+out, "UNSET_ONLY_FOR_OTHER") {
+		t.Errorf("error should name the unset var, got err=%v out=%s", err, out)
+	}
+}
+
 func TestApply_EnvFilter_UnknownEnvRejected(t *testing.T) {
 	dir := multiEnvDir(t)
 	clearCoolifyEnv(t)

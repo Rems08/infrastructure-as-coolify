@@ -36,6 +36,22 @@ func filterByEnv[T any](items []T, allow []string, envOf func(T) string) []T {
 	return out
 }
 
+// filterByName keeps the items whose logical name equals only. An empty only means no name
+// filter is active, so every item is kept. Used to narrow by --target before resolving
+// secrets, so a scoped apply only binds the env vars its own resources reference.
+func filterByName[T any](items []T, only string, nameOf func(T) string) []T {
+	if only == "" {
+		return items
+	}
+	out := make([]T, 0, len(items))
+	for _, it := range items {
+		if nameOf(it) == only {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
 // exit2 prints a user-facing error and requests process exit code 2, the code reserved for
 // an invalid selection (a misspelled --env or an empty --target/--env combination) so a typo
 // fails loudly instead of silently selecting nothing.

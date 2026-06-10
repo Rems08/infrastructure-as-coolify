@@ -5,7 +5,7 @@ Thanks for considering a contribution! This is an OSS Go project (Apache-2.0).
 ## Ground rules
 
 - **Single Go toolchain.** Every `make` step runs on the toolchain pinned in the `Makefile`
-  (`GOTOOLCHAIN`, currently go1.25.10 — the patch line `govulncheck` reports free of stdlib
+  (`GOTOOLCHAIN`, currently go1.25.11 — the patch line `govulncheck` reports free of stdlib
   advisories), analysed by golangci-lint v2. All business logic lives in `internal/`;
   `cmd/iac-coolify/` only parses the CLI.
 - **`make verify` must be green before every push.** It runs `gofmt`, `go vet`,

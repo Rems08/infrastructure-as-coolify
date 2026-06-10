@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/Rems08/infrastructure-as-coolify/internal/coolify"
 	"github.com/Rems08/infrastructure-as-coolify/internal/secrets"
@@ -27,6 +28,13 @@ func buildClient(flagURL string) (*coolify.Client, bool, error) {
 		return nil, false, err
 	}
 	opts := coolify.Options{BaseURL: url, Token: tok}
+	if t := os.Getenv("IAC_COOLIFY_HTTP_TIMEOUT"); t != "" {
+		d, dErr := time.ParseDuration(t)
+		if dErr != nil {
+			return nil, false, fmt.Errorf("IAC_COOLIFY_HTTP_TIMEOUT: %w", dErr)
+		}
+		opts.Timeout = d
+	}
 	if id := os.Getenv("CF_ACCESS_CLIENT_ID"); id != "" {
 		sec, sErr := secrets.NewFromEnv("CF_ACCESS_CLIENT_SECRET")
 		if sErr != nil {

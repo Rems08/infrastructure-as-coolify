@@ -28,6 +28,7 @@ func loadEnvFile(path string) (int, error) {
 	defer func() { _ = f.Close() }()
 
 	n, line := 0, 0
+	fromFile := map[string]bool{} // keys this file already set, so duplicates are last-wins
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for sc.Scan() {
@@ -36,25 +37,40 @@ func loadEnvFile(path string) (int, error) {
 		if raw == "" || strings.HasPrefix(raw, "#") {
 			continue
 		}
-		raw = strings.TrimPrefix(raw, "export ")
+		raw = trimExportPrefix(raw)
 		eq := strings.IndexByte(raw, '=')
 		if eq <= 0 {
-			return n, fmt.Errorf("env-file: line %d is not KEY=VALUE: %q", line, sc.Text())
+			// Report the line number only — never the content, which may be a secret value.
+			return n, fmt.Errorf("env-file: line %d is not KEY=VALUE", line)
 		}
 		key := strings.TrimSpace(raw[:eq])
 		val := unquoteEnvValue(strings.TrimSpace(raw[eq+1:]))
-		if _, ok := os.LookupEnv(key); ok {
-			continue // the real environment wins over the file
+		// A pre-existing real environment variable wins over the file; a key the file set
+		// earlier is overwritten (dotenv last-wins).
+		if _, ok := os.LookupEnv(key); ok && !fromFile[key] {
+			continue
 		}
 		if err := os.Setenv(key, val); err != nil {
 			return n, fmt.Errorf("env-file: set %s: %w", key, err)
 		}
-		n++
+		if !fromFile[key] {
+			n++
+			fromFile[key] = true
+		}
 	}
 	if err := sc.Err(); err != nil {
 		return n, fmt.Errorf("env-file: %w", err)
 	}
 	return n, nil
+}
+
+// trimExportPrefix drops a leading `export` only when followed by whitespace, so a key named
+// `exported` is never mangled.
+func trimExportPrefix(s string) string {
+	if rest, ok := strings.CutPrefix(s, "export"); ok && rest != "" && (rest[0] == ' ' || rest[0] == '\t') {
+		return strings.TrimSpace(rest)
+	}
+	return s
 }
 
 // unquoteEnvValue strips one layer of matching surrounding single or double quotes.

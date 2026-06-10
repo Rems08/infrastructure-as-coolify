@@ -48,6 +48,34 @@ func TestLoadEnvFile(t *testing.T) {
 	}
 }
 
+func TestLoadEnvFile_LastWinsAndExportVariants(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "dup.env")
+	body := "DUP=first\n" +
+		"export\tTABBED=ok\n" +
+		"DUP=second\n" +
+		"exported=keepme\n" // not an export prefix: key literally named "exported"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"DUP", "TABBED", "exported"} {
+		_ = os.Unsetenv(k)
+		t.Cleanup(func() { _ = os.Unsetenv(k) }) //nolint:gocritic // best-effort
+	}
+	if _, err := loadEnvFile(path); err != nil {
+		t.Fatalf("loadEnvFile: %v", err)
+	}
+	if got := os.Getenv("DUP"); got != "second" {
+		t.Errorf("DUP = %q, want \"second\" (last wins)", got)
+	}
+	if got := os.Getenv("TABBED"); got != "ok" {
+		t.Errorf("TABBED = %q, want \"ok\" (export<tab> stripped)", got)
+	}
+	if got := os.Getenv("exported"); got != "keepme" {
+		t.Errorf("exported = %q, want \"keepme\" (export prefix not over-stripped)", got)
+	}
+}
+
 func TestLoadEnvFile_EmptyPathIsNoop(t *testing.T) {
 	if n, err := loadEnvFile(""); err != nil || n != 0 {
 		t.Fatalf("empty path: n=%d err=%v, want 0,nil", n, err)

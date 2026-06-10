@@ -68,7 +68,7 @@ plan:staging:
   extends: .iac-coolify-plan
   variables: { IAC_COOLIFY_ARGS: "--env staging" }
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_BRANCH =~ /-staging$/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-staging$/'
 
 # A `*-staging` MR pipeline applies staging (staging is the test environment).
 # extends brings the apply script; the rules here replace the template's default-branch rule.
@@ -76,7 +76,7 @@ apply:staging:
   extends: .iac-coolify-apply
   variables: { IAC_COOLIFY_ARGS: "--env staging" }
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_BRANCH =~ /-staging$/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-staging$/'
       when: manual
 
 # The default branch applies production.

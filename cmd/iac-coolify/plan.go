@@ -33,6 +33,7 @@ type planOptions struct {
 	detailedExit bool
 	stateCache   string
 	openapiDir   string
+	envFile      string
 }
 
 func newPlanCmd() *cobra.Command {
@@ -59,10 +60,14 @@ func newPlanCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&opts.detailedExit, "detailed-exitcode", false, "Exit 0 (no changes), 2 (changes), 1 (error)")
 	cmd.Flags().StringVar(&opts.stateCache, "state-cache", "", "Write the resolved UUID map to this JSON file")
 	cmd.Flags().StringVar(&opts.openapiDir, "openapi-dir", "testdata/openapi", "Directory of the pinned OpenAPI spec for boot checksum verification")
+	cmd.Flags().StringVar(&opts.envFile, "env-file", "", "Load ${env:} values from a dotenv file before resolving (real env vars win)")
 	return cmd
 }
 
 func runPlan(ctx context.Context, cmd *cobra.Command, opts planOptions) error {
+	if _, err := loadEnvFile(opts.envFile); err != nil {
+		return fmt.Errorf("plan: %w", err)
+	}
 	format := resolveFormat(opts.output)
 	log := newLogger(format)
 

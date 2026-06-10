@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-06-10
+
+### Added
+
+- `--env-file` (on `plan` and `apply`) loads `${env:}` values from a dotenv file before
+  resolving, so an application's environment can be supplied as a single per-app secret
+  (`KEY=VALUE` lines, `#` comments, optional `export ` prefix and surrounding quotes) instead
+  of dozens of separate CI variables. A real environment variable always wins over the file, so
+  CI-injected tokens are never shadowed. Pairs with a GitLab File-type CI variable
+  (`--env-file $APP_ENV`). No external dependency added.
+
 ## [0.1.2] - 2026-06-10
 
 ### Fixed
@@ -343,7 +354,8 @@ SLSA build level 3 provenance. It aggregates every change below.
   architecture test that fails when docs drift from the structs.
 - State cache type that refuses to marshal if it ever gains a `Secret` field.
 
-[Unreleased]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.0-rc.2...v0.1.0

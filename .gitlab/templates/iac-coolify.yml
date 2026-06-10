@@ -26,6 +26,12 @@ variables:
   # Per-request HTTP timeout. Raise it when the Coolify instance is slow to
   # respond (large topology, loaded host); the binary's default is 30s.
   IAC_COOLIFY_HTTP_TIMEOUT: ""
+  # Extra flags for the plan job only. Empty by default so a plan with pending
+  # changes exits 0 (the diff is in the job log) and an apply job in a later
+  # stage of the same pipeline can still run. Set to "--detailed-exitcode" for
+  # a gating plan that fails (exit 2) on pending changes, e.g. in a
+  # merge-request pipeline with no apply stage after it.
+  IAC_COOLIFY_PLAN_FLAGS: ""
 
 .iac-coolify-base:
   image: alpine:3.20
@@ -46,7 +52,7 @@ variables:
   extends: .iac-coolify-base
   stage: test
   script:
-    - iac-coolify plan "${IAC_COOLIFY_PATH}" ${IAC_COOLIFY_ARGS} --detailed-exitcode
+    - iac-coolify plan "${IAC_COOLIFY_PATH}" ${IAC_COOLIFY_ARGS} ${IAC_COOLIFY_PLAN_FLAGS}
 
 .iac-coolify-apply:
   extends: .iac-coolify-base

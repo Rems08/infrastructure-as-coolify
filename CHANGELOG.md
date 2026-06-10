@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- GitLab CI template: `.iac-coolify-plan` no longer forces `--detailed-exitcode`. A plan
+  with pending changes used to exit 2, which GitLab reports as a failed job and which
+  blocks any apply job in a later stage of the same pipeline — a change could be planned
+  but never auto-applied. The plan job now exits 0 with the diff in the job log
+  (Terraform-like); opt back into the gating behaviour with the new
+  `IAC_COOLIFY_PLAN_FLAGS: "--detailed-exitcode"` variable.
+
 ## [0.1.4] - 2026-06-10
 
 ### Security

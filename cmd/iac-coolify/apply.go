@@ -160,13 +160,8 @@ func buildOperations(ctx context.Context, cmd *cobra.Command, client *coolify.Cl
 		return nil, err
 	}
 
-	// Load keeps ${env:} references unresolved; apply is the one place they are bound to a
-	// value, so an unset env var fails here with a clear message instead of pushing an empty
-	// value. destroy never calls this — it has no use for the resolved values.
-	if err = config.ResolveSecrets(apps, services, dbs); err != nil {
-		return nil, err
-	}
-
+	// Validate the selection against the full, unfiltered set so a misspelled --target/--env
+	// is caught before any narrowing.
 	if vErr := validateSelection(cmd, opts.only, opts.envFilter, opts.target, projects, envs, apps, services, dbs); vErr != nil {
 		return nil, vErr
 	}
@@ -174,6 +169,17 @@ func buildOperations(ctx context.Context, cmd *cobra.Command, client *coolify.Cl
 	apps = filterByEnv(apps, opts.envFilter, func(a resource.Application) string { return a.Metadata.Environment })
 	services = filterByEnv(services, opts.envFilter, func(ls config.LoadedService) string { return ls.Service.Metadata.Environment })
 	dbs = filterByEnv(dbs, opts.envFilter, func(d resource.Database) string { return d.Metadata.Environment })
+	apps = filterByName(apps, opts.only, func(a resource.Application) string { return a.Metadata.Name })
+	services = filterByName(services, opts.only, func(ls config.LoadedService) string { return ls.Service.Metadata.Name })
+	dbs = filterByName(dbs, opts.only, func(d resource.Database) string { return d.Metadata.Name })
+
+	// Load keeps ${env:} references unresolved; apply is the one place they are bound to a
+	// value, so an unset env var fails here with a clear message instead of pushing an empty
+	// value. Resolve only what survived the --env/--target filters, so a scoped apply never
+	// needs env values for resources it is not touching. destroy never calls this.
+	if err = config.ResolveSecrets(apps, services, dbs); err != nil {
+		return nil, err
+	}
 
 	ops := projectEnvOps(projects, envs, resolved, opts.only)
 	appOps, err := applicationOps(ctx, client, resolved, apps, opts.only)

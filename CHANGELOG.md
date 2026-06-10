@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-06-10
+
+### Fixed
+
+- `apply` now applies the `--env` and `--target` filters **before** resolving `${env:}`
+  references, so a scoped apply only needs the environment values of the resources it actually
+  touches. Previously every loaded manifest was resolved up front, so `apply --target X` failed
+  if any *other* application referenced an env var that was not set in the runner — which broke
+  the first scoped CI apply.
+
 ## [0.1.1] - 2026-06-10
 
 ### Added
@@ -333,7 +343,8 @@ SLSA build level 3 provenance. It aggregates every change below.
   architecture test that fails when docs drift from the structs.
 - State cache type that refuses to marshal if it ever gains a `Secret` field.
 
-[Unreleased]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.0-rc.2...v0.1.0
 [0.1.0-rc.2]: https://github.com/Rems08/infrastructure-as-coolify/releases/tag/v0.1.0-rc.2

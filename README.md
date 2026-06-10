@@ -85,14 +85,14 @@ docker run --rm ghcr.io/rems08/infrastructure-as-coolify version
 ```
 
 Images are multi-arch (`linux/amd64`, `linux/arm64`). Replace `:latest` with a version such
-as `:0.1.3` to pin a release.
+as `:0.1.4` to pin a release.
 
 ## Verifying release signatures
 
 Every release is signed with [cosign](https://docs.sigstore.dev/cosign/overview/) keyless
 (no long-lived key — the signature is bound to this repository's GitHub Actions identity) and
 ships [SLSA build level 3](https://slsa.dev/spec/v1.0/levels#build-l3) provenance. Set
-`TAG` to the release you downloaded, e.g. `TAG=v0.1.3`.
+`TAG` to the release you downloaded, e.g. `TAG=v0.1.4`.
 
 ```sh
 # Verify a downloaded archive against its cosign bundle
@@ -498,7 +498,7 @@ and tags, `destroy` is manual:
 
 ```yaml
 include:
-  - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.3/.gitlab/templates/iac-coolify.yml"
+  - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.4/.gitlab/templates/iac-coolify.yml"
 
 plan:
   extends: .iac-coolify-plan

@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-06-10
+
+### Security
+
+- `--env-file` no longer echoes the offending line in its error on a malformed entry (it
+  reported `line N is not KEY=VALUE: "<content>"`), since that content can be a secret value
+  that would then land in CI logs. The error now names the line number only.
+
+### Changed
+
+- `--env-file` duplicate keys are now last-wins (the dotenv convention) instead of first-wins;
+  a pre-existing real environment variable still wins over the file. The `export` prefix is
+  stripped only when followed by whitespace, so a key literally named `exported` is preserved.
+
 ## [0.1.3] - 2026-06-10
 
 ### Added
@@ -354,7 +368,8 @@ SLSA build level 3 provenance. It aggregates every change below.
   architecture test that fails when docs drift from the structs.
 - State cache type that refuses to marshal if it ever gains a `Secret` field.
 
-[Unreleased]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.0...v0.1.1

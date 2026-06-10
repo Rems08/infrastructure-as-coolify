@@ -64,7 +64,7 @@ dockers_v2:
       org.opencontainers.image.source: https://github.com/Rems08/infrastructure-as-coolify
       org.opencontainers.image.version: "{{ .Version }}"
       org.opencontainers.image.revision: "{{ .FullCommit }}"
-      org.opencontainers.image.licenses: CC0-1.0
+      org.opencontainers.image.licenses: Apache-2.0
 
 # Keyless signing: cosign mints a short-lived certificate from the workflow's
 # OIDC identity, so there is no long-lived key to manage. Each bundle is

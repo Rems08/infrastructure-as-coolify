@@ -34,7 +34,7 @@ Include the reusable template and extend the jobs you need:
 
 ```yaml
 include:
-  - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.2/.gitlab/templates/iac-coolify.yml"
+  - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.3/.gitlab/templates/iac-coolify.yml"
 
 plan:
   extends: .iac-coolify-plan
@@ -46,6 +46,34 @@ destroy:
 
 Set `IAC_COOLIFY_PATH` (config directory) and `IAC_COOLIFY_ARGS` (e.g. `--env staging`) as CI
 variables, and store `COOLIFY_API_TOKEN` as a masked, protected variable.
+
+### Supplying `${env:}` values (one secret per application)
+
+`apply` resolves every `${env:KEY}` reference to a real value and pushes it to Coolify, so each
+referenced variable must be present in the job environment. Rather than declaring dozens of
+individual CI variables, store one **File**-type CI/CD variable per application holding a dotenv
+blob, and pass it with `--env-file`:
+
+```
+# CI/CD variable RCA_STAGING_ENV (type: File, protected), content:
+DJANGO_SETTINGS_MODULE=config.settings.staging
+DATABASE_URL=postgres://...
+# ... one KEY=VALUE per referenced env var
+```
+
+```yaml
+apply:
+  extends: .iac-coolify-apply
+  variables:
+    IAC_COOLIFY_ARGS: "--env staging --target my-app --env-file $RCA_STAGING_ENV"
+```
+
+A File variable's value is the path GitLab writes the content to, so `--env-file $RCA_STAGING_ENV`
+points the binary at it. The file is dotenv format (`KEY=VALUE`, `#` comments, blank lines, an
+optional `export ` prefix, optional surrounding quotes; the first `=` splits, so values may
+contain `=`). A real environment variable always wins over the file, so tokens injected by CI
+(`COOLIFY_API_TOKEN`, `CF_ACCESS_*`) are never shadowed. `plan` accepts `--env-file` too but does
+not need it — it compares by reference origin, not resolved value.
 
 ### Slow or loaded Coolify instances
 
@@ -61,7 +89,7 @@ this — nothing tool-specific is required:
 
 ```yaml
 include:
-  - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.2/.gitlab/templates/iac-coolify.yml"
+  - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.3/.gitlab/templates/iac-coolify.yml"
 
 # Every MR shows the diff for the environment it targets (job is green on no-op).
 plan:staging:

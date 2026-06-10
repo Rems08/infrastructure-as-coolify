@@ -15,7 +15,7 @@ docker run --rm ghcr.io/rems08/infrastructure-as-coolify version
 ```
 
 Images are multi-arch (`linux/amd64`, `linux/arm64`). Replace `:latest` with a version such
-as `:0.1.2` to pin a release.
+as `:0.1.3` to pin a release.
 
 ## 2. Validate a configuration
 

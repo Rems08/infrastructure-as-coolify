@@ -32,6 +32,7 @@ type applyOptions struct {
 	stateCache  string
 	openapiDir  string
 	auditLog    string
+	envFile     string
 }
 
 func newApplyCmd() *cobra.Command {
@@ -63,12 +64,16 @@ func newApplyCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.stateCache, "state-cache", "", "Write the resolved UUID map to this JSON file")
 	cmd.Flags().StringVar(&opts.openapiDir, "openapi-dir", "testdata/openapi", "Directory of the pinned OpenAPI spec for boot checksum verification")
 	cmd.Flags().StringVar(&opts.auditLog, "audit-log", ".iac-coolify/audit.log", "Append-only audit log path")
+	cmd.Flags().StringVar(&opts.envFile, "env-file", "", "Load ${env:} values from a dotenv file before resolving (real env vars win)")
 	return cmd
 }
 
 func runApply(ctx context.Context, cmd *cobra.Command, opts applyOptions) error {
 	if opts.parallelism != 1 {
 		return fmt.Errorf("apply: only --parallelism=1 is supported in this release")
+	}
+	if _, err := loadEnvFile(opts.envFile); err != nil {
+		return fmt.Errorf("apply: %w", err)
 	}
 	// A non-interactive run must opt in explicitly, before any Coolify connection, so CI
 	// can never apply silently. A dry-run mutates nothing and is exempt.

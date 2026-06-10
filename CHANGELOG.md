@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-10
+
+First stable release. Functionally identical to `v0.1.0-rc.2` plus everything below;
+promoted after a week of live dogfooding against the production Coolify instance.
+
 ### Added (import)
 
 - New `iac-coolify import [dir]` command reverse-engineers a live Coolify instance into local
@@ -314,5 +319,6 @@ SLSA build level 3 provenance. It aggregates every change below.
   architecture test that fails when docs drift from the structs.
 - State cache type that refuses to marshal if it ever gains a `Secret` field.
 
-[Unreleased]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.0-rc.2...HEAD
+[Unreleased]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.0-rc.2...v0.1.0
 [0.1.0-rc.2]: https://github.com/Rems08/infrastructure-as-coolify/releases/tag/v0.1.0-rc.2

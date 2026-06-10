@@ -47,6 +47,11 @@ destroy:
 Set `IAC_COOLIFY_PATH` (config directory) and `IAC_COOLIFY_ARGS` (e.g. `--env staging`) as CI
 variables, and store `COOLIFY_API_TOKEN` as a masked, protected variable.
 
+A plan with pending changes exits 0 — the diff is in the job log and an apply job in a later
+stage of the same pipeline can still run. For a gating plan that fails (exit 2) on pending
+changes — e.g. in a merge-request pipeline with no apply stage after it — set
+`IAC_COOLIFY_PLAN_FLAGS: "--detailed-exitcode"`.
+
 ### Supplying `${env:}` values (one secret per application)
 
 `apply` resolves every `${env:KEY}` reference to a real value and pushes it to Coolify, so each

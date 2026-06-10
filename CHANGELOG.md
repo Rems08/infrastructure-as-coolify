@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-10
+
+### Added
+
+- `IAC_COOLIFY_HTTP_TIMEOUT` environment variable overrides the 30s per-request HTTP timeout
+  (a Go duration such as `120s` or `4m`), for slow or loaded Coolify instances where the
+  default trips before a large topology finishes responding. An unparseable value fails loudly.
+  The GitLab CI template exposes it as a variable.
+
+### Documentation
+
+- CI how-to: the environment-per-branch convention (default branch → production, `*-staging`
+  merge requests → staging) expressed with job `rules` and `--env`, plus `--target` piloting.
+
 ## [0.1.0] - 2026-06-10
 
 First stable release. Functionally identical to `v0.1.0-rc.2` plus everything below;
@@ -319,6 +333,7 @@ SLSA build level 3 provenance. It aggregates every change below.
   architecture test that fails when docs drift from the structs.
 - State cache type that refuses to marshal if it ever gains a `Secret` field.
 
-[Unreleased]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Rems08/infrastructure-as-coolify/compare/v0.1.0-rc.2...v0.1.0
 [0.1.0-rc.2]: https://github.com/Rems08/infrastructure-as-coolify/releases/tag/v0.1.0-rc.2

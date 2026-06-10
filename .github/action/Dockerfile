@@ -5,7 +5,7 @@
 # A shell base (not the distroless release image) is needed because the
 # entrypoint turns the action inputs into CLI flags, and running as root avoids
 # the GitHub workspace write-permission issue a non-root image would hit.
-FROM ghcr.io/rems08/infrastructure-as-coolify:0.1.3 AS bin
+FROM ghcr.io/rems08/infrastructure-as-coolify:0.1.4 AS bin
 
 FROM alpine:3.20
 COPY --from=bin /iac-coolify /usr/local/bin/iac-coolify

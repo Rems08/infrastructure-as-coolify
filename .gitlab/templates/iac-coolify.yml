@@ -1,7 +1,7 @@
 # Reusable iac-coolify CI/CD template. Include it and extend the jobs you need:
 #
 #   include:
-#     - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.0/.gitlab/templates/iac-coolify.yml"
+#     - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.1/.gitlab/templates/iac-coolify.yml"
 #
 #   plan:
 #     extends: .iac-coolify-plan
@@ -18,11 +18,14 @@
 # slim shell image and verify its checksum before running it.
 
 variables:
-  IAC_COOLIFY_VERSION: "0.1.0"
+  IAC_COOLIFY_VERSION: "0.1.1"
   IAC_COOLIFY_ARCH: "amd64"
   IAC_COOLIFY_PATH: "."
   # Extra flags such as --target <name> or --env <name>; left empty by default.
   IAC_COOLIFY_ARGS: ""
+  # Per-request HTTP timeout. Raise it when the Coolify instance is slow to
+  # respond (large topology, loaded host); the binary's default is 30s.
+  IAC_COOLIFY_HTTP_TIMEOUT: ""
 
 .iac-coolify-base:
   image: alpine:3.20

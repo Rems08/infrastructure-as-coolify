@@ -1,0 +1,39 @@
+{
+  "id": 0,
+  "uuid": "REDACTED-app-uuid",
+  "name": "restaurant-core-api-staging",
+  "fqdn": "https://staging-api.example.com",
+  "build_pack": "dockerfile",
+  "docker_registry_image_name": "registry.example.com/beenaire/restaurant-core-api",
+  "docker_registry_image_tag": "v1-0-0",
+  "git_repository": "REDACTED-git-repository",
+  "git_branch": "main",
+  "ports_exposes": "8000",
+  "status": "running:healthy",
+  "environment_id": 10,
+  "destination_type": "App\\Models\\StandaloneDocker",
+  "destination_id": 0,
+  "destination": {
+    "id": 0,
+    "name": "coolify",
+    "uuid": "REDACTED-destination-uuid",
+    "network": "coolify",
+    "server_id": 0,
+    "created_at": "2026-MM-DDTHH:mm:ss.000000Z",
+    "updated_at": "2026-MM-DDTHH:mm:ss.000000Z",
+    "server": {
+      "id": 0,
+      "uuid": "REDACTED-server-uuid",
+      "name": "localhost",
+      "description": "Server description (free text)",
+      "ip": "host.docker.internal",
+      "port": 22,
+      "user": "root",
+      "team_id": 0,
+      "private_key_id": 0
+    }
+  },
+  "server": null,
+  "created_at": "2026-MM-DDTHH:mm:ss.000000Z",
+  "updated_at": "2026-MM-DDTHH:mm:ss.000000Z"
+}

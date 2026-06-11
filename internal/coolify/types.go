@@ -21,6 +21,11 @@ type Application struct {
 	PortsExposes            string `json:"ports_exposes"`
 	Status                  string `json:"status"`
 	EnvironmentID           int    `json:"environment_id"`
+
+	// Destination carries the hosting server and docker network. The payload's top-level
+	// "server" field is null at runtime, so destination.server is the only reliable source
+	// of the hosting server (observed 2026-06-10, testdata/application-singular.json).
+	Destination Destination `json:"destination"`
 }
 
 // Project mirrors components.schemas.Project: the documented fields the UUID resolver
@@ -136,16 +141,19 @@ type Database struct {
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
 
-	Destination DatabaseDestination `json:"destination"`
+	Destination Destination `json:"destination"`
 }
 
-// DatabaseDestination is the subset of the nested destination object the reconciler reads:
-// the network a database is attached to. The full object also carries the server and its
-// settings, which iac-coolify does not consume.
-type DatabaseDestination struct {
+// Destination is the subset of the nested destination object the reconciler reads: the
+// docker network a resource is attached to and the server hosting it. The full object also
+// carries proxy and settings blobs, which iac-coolify does not consume. Server.Name is the
+// logical name compared against the desired destination — never the UUID, so manifests keep
+// logical references.
+type Destination struct {
 	UUID    string `json:"uuid"`
 	Name    string `json:"name"`
 	Network string `json:"network"`
+	Server  Server `json:"server"`
 }
 
 // CreateResponse is the shared 201 body of the create endpoints: a single uuid.

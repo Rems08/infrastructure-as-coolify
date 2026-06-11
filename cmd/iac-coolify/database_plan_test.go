@@ -57,15 +57,16 @@ func coolifyDBMux(t *testing.T) *httptest.Server {
 		`{"id":2,"uuid":"db-redis-staging","name":"redis-database-restaurant-core-api-staging","type":"standalone-redis","status":"running:healthy","created_at":"","updated_at":""},` +
 		`{"id":3,"uuid":"db-redis-prod","name":"redis-database-restaurant-core-api","type":"standalone-redis","status":"running:healthy","created_at":"","updated_at":""}` +
 		`]`
+	destination := `"destination":{"uuid":"d-1","name":"coolify","network":"coolify","server":{"uuid":"srv-1","name":"localhost"}}`
 	pg := `{"uuid":"db-pg","name":"pg-restaurant-core-api-staging","image":"postgres:18-alpine",` +
 		`"is_public":false,"public_port":5432,"limits_cpu_shares":1024,"limits_memory":"0",` +
-		`"postgres_password":"` + pgSecret + `","internal_db_url":"postgres://u:` + pgSecret + `@host/db","status":"running:healthy"}`
+		`"postgres_password":"` + pgSecret + `","internal_db_url":"postgres://u:` + pgSecret + `@host/db","status":"running:healthy",` + destination + `}`
 	redisStaging := `{"uuid":"db-redis-staging","name":"redis-database-restaurant-core-api-staging","image":"redis:7-alpine",` +
 		`"is_public":false,"public_port":6379,"limits_cpu_shares":1024,"limits_memory":"0",` +
-		`"redis_password":"` + redisSecret + `","status":"running:healthy"}`
+		`"redis_password":"` + redisSecret + `","status":"running:healthy",` + destination + `}`
 	redisProd := `{"uuid":"db-redis-prod","name":"redis-database-restaurant-core-api","image":"redis:7-alpine",` +
 		`"is_public":false,"public_port":6379,"limits_cpu_shares":1024,"limits_memory":"0",` +
-		`"redis_password":"` + redisSecret + `","status":"running:healthy"}`
+		`"redis_password":"` + redisSecret + `","status":"running:healthy",` + destination + `}`
 	bodies := map[string]string{
 		"/api/v1/projects":                   `[{"id":1,"uuid":"p1","name":"beenaire"}]`,
 		"/api/v1/projects/p1/environments":   `[{"id":10,"name":"staging"},{"id":11,"name":"production"}]`,

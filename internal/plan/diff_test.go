@@ -235,6 +235,12 @@ func TestRenderTextGolden(t *testing.T) {
 		f("fqdn", plan.Scalar("https://web.example.com")),
 		f("port", plan.Scalar("3000")),
 	), &updActual)
+	movedActual := res("Application", "moved",
+		plan.Field{Name: "destination.server", Value: plan.Scalar("localhost"), ForcesRecreate: true},
+	)
+	p.Add(res("Application", "moved",
+		plan.Field{Name: "destination.server", Value: plan.Scalar("hetzner-1"), ForcesRecreate: true},
+	), &movedActual)
 
 	got := p.RenderText()
 	goldenPath := filepath.Join("testdata", "plan_render.golden")

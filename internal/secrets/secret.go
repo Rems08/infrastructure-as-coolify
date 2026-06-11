@@ -12,10 +12,21 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/goccy/go-yaml"
 )
+
+// envRefPattern matches a ${env:VAR} reference embedded anywhere in a string, where VAR is
+// an upper-snake identifier (the same grammar the config interpolator accepts).
+var envRefPattern = regexp.MustCompile(`\$\{env:[A-Z_][A-Z0-9_]*\}`)
+
+// ContainsEnvRef reports whether raw still carries a ${env:VAR} reference. Read-only flows
+// (validate, plan, explore) load visible Param fields without resolving these references —
+// only apply binds them — so a value for which this returns true is unknown until apply and
+// cannot be compared meaningfully against a live value.
+func ContainsEnvRef(raw string) bool { return envRefPattern.MatchString(raw) }
 
 // Source identifies where a Secret was loaded from. Used in audit log + diff display.
 type Source uint8

@@ -3,5 +3,7 @@
     + Application.new.port = "8080"
 ~ Application.web will be updated
     ~ Application.web.fqdn: "https://old" -> "https://web.example.com"
+-/+ Application.moved must be recreated (destination changed: server "localhost" -> "hetzner-1")
+    ~ Application.moved.destination.server: "localhost" -> "hetzner-1"
 
-Plan: 1 to add, 1 to change, 0 to destroy.
+Plan: 1 to add, 2 to change, 0 to destroy.

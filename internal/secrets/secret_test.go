@@ -340,3 +340,25 @@ func TestHashStableAndDistinct(t *testing.T) {
 		t.Error("hash must not contain the value")
 	}
 }
+
+// TestContainsEnvRef pins the reference grammar: upper-snake names embedded anywhere match;
+// lowercase names, malformed braces and plain values do not.
+func TestContainsEnvRef(t *testing.T) {
+	tests := []struct {
+		in   string
+		want bool
+	}{
+		{"${env:STAGING_SERVER}", true},
+		{"prefix-${env:HOST}.example.com", true},
+		{"${env:lowercase}", false},
+		{"${env:STAGING_SERVER", false},
+		{"localhost", false},
+		{"", false},
+		{"${sops:db.password}", false},
+	}
+	for _, tt := range tests {
+		if got := ContainsEnvRef(tt.in); got != tt.want {
+			t.Errorf("ContainsEnvRef(%q) = %v, want %v", tt.in, got, tt.want)
+		}
+	}
+}

@@ -51,9 +51,13 @@ func (v Value) display() string {
 }
 
 // Field is one semantic field of a resource; declaration order is preserved for output.
+// ForcesRecreate marks a field the remote API cannot patch in place (the destination pair):
+// a change on it means the resource must be destroyed and recreated, and the diff engine
+// carries that signal on the resulting Change.
 type Field struct {
-	Name  string
-	Value Value
+	Name           string
+	Value          Value
+	ForcesRecreate bool
 }
 
 // Resource is a normalized, diffable snapshot of one managed resource.
@@ -65,12 +69,15 @@ type Resource struct {
 
 // Change is a single field-level difference. Old and New are display-safe: for secrets
 // they carry only the source declaration or a redacted note, never the value.
+// RequiresRecreate is set when the changed field cannot be patched in place (a destination
+// move): converging it takes a destroy followed by a fresh apply.
 type Change struct {
-	Op        Op     `json:"op"`
-	Path      string `json:"path"`
-	Old       string `json:"old,omitempty"`
-	New       string `json:"new,omitempty"`
-	Sensitive bool   `json:"sensitive,omitempty"`
+	Op               Op     `json:"op"`
+	Path             string `json:"path"`
+	Old              string `json:"old,omitempty"`
+	New              string `json:"new,omitempty"`
+	Sensitive        bool   `json:"sensitive,omitempty"`
+	RequiresRecreate bool   `json:"requires_recreate,omitempty"`
 }
 
 // Diff returns the field-level changes that turn actual into desired. A nil actual means
@@ -103,16 +110,17 @@ func Diff(desired Resource, actual *Resource) []Change {
 		path := prefix + "." + df.Name
 		av, ok := actualByName[df.Name]
 		if !ok {
-			changes = append(changes, Change{Op: OpAdd, Path: path, New: df.Value.display(), Sensitive: df.Value.isSecret})
+			changes = append(changes, Change{Op: OpAdd, Path: path, New: df.Value.display(), Sensitive: df.Value.isSecret, RequiresRecreate: df.ForcesRecreate})
 			continue
 		}
 		if c, changed := diffValue(path, av, df.Value); changed {
+			c.RequiresRecreate = df.ForcesRecreate
 			changes = append(changes, c)
 		}
 	}
 	for _, af := range actual.Fields {
 		if !desiredSeen[af.Name] {
-			changes = append(changes, Change{Op: OpDelete, Path: prefix + "." + af.Name, Old: af.Value.display(), Sensitive: af.Value.isSecret})
+			changes = append(changes, Change{Op: OpDelete, Path: prefix + "." + af.Name, Old: af.Value.display(), Sensitive: af.Value.isSecret, RequiresRecreate: af.ForcesRecreate})
 		}
 	}
 	return changes
@@ -128,6 +136,13 @@ func diffValue(path string, old, newv Value) (Change, bool) {
 		// The field flipped between visible and secret; surface it without leaking.
 		return Change{Op: OpUpdate, Path: path, Old: old.display(), New: newv.display(), Sensitive: true}, true
 	default:
+		// A desired Param still carrying a ${env:} reference is unknown until apply (plan and
+		// validate never resolve references); comparing the literal "${env:VAR}" text against
+		// the live value would report a phantom change, so it is treated as stable. Apply
+		// resolves the reference first and diffs the real value.
+		if secrets.ContainsEnvRef(newv.scalar) {
+			return Change{}, false
+		}
 		if cmp.Equal(old.scalar, newv.scalar) {
 			return Change{}, false
 		}

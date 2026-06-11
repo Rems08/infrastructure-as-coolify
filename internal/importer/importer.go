@@ -26,7 +26,7 @@ type Client interface {
 // Options configure an import run.
 type Options struct {
 	Dir            string   // target directory the manifests are scaffolded under
-	DefaultNetwork string   // network written on every resource (the API exposes none)
+	DefaultNetwork string   // network written when the live payload does not expose one
 	EnvFilter      []string // when non-empty, only these environments are imported
 	Force          bool     // overwrite existing manifests instead of refusing
 	APIURL         string   // Coolify URL recorded in the scaffolded root manifest
@@ -133,7 +133,7 @@ func collectApplication(ctx context.Context, client Client, d discovered, opts O
 	if err != nil {
 		return plannedFile{}, false, err
 	}
-	mapped, keys := mapApplication(app, d.server, opts.DefaultNetwork, env, envs)
+	mapped, keys := mapApplication(app, d.server, networkOrDefault(app.Destination.Network, opts.DefaultNetwork), env, envs)
 	res := AppResult{Name: mapped.Metadata.Name, Environment: env.name, Complete: true}
 	if vErr := mapped.Validate(); vErr != nil {
 		res.Complete = false
@@ -157,13 +157,23 @@ func collectDatabase(ctx context.Context, client Client, d discovered, opts Opti
 	if !matchesEnv(opts.EnvFilter, env.name) {
 		return plannedFile{}, false, nil
 	}
-	mapped, passwordEnv, err := mapDatabase(db, d.server, opts.DefaultNetwork, env)
+	mapped, passwordEnv, err := mapDatabase(db, d.server, networkOrDefault(db.Destination.Network, opts.DefaultNetwork), env)
 	if err != nil {
 		return plannedFile{}, false, err
 	}
 	rep.Databases = append(rep.Databases, mapped.Metadata.Name)
 	rep.PasswordEnvs = append(rep.PasswordEnvs, passwordEnv)
 	return planDatabase(opts.Dir, mapped), true, nil
+}
+
+// networkOrDefault prefers the network reported by the live destination payload, so an
+// imported manifest plans clean even when the --default-network flag does not match the
+// instance. The fallback covers payloads that omit the nested destination object.
+func networkOrDefault(live, fallback string) string {
+	if live != "" {
+		return live
+	}
+	return fallback
 }
 
 // buildEnvIndex maps each environment id to its (project, environment) names by enumerating

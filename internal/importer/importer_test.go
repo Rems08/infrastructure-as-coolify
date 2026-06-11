@@ -223,3 +223,34 @@ func TestRun_DroppedWhenEnvUnknown(t *testing.T) {
 		t.Errorf("dropped = %d, want 1", rep.Dropped)
 	}
 }
+
+// TestRun_PrefersLiveDestinationNetwork asserts the network is taken from the live
+// destination payload when present, so the imported manifest matches what plan compares
+// against; DefaultNetwork only fills the gap for payloads without one.
+func TestRun_PrefersLiveDestinationNetwork(t *testing.T) {
+	dir := t.TempDir()
+	fake := newFake()
+	app := fake.apps["u-api"]
+	app.Destination = coolify.Destination{Network: "live-net", Server: coolify.Server{UUID: "srv-1", Name: "localhost"}}
+	fake.apps["u-api"] = app
+	db := fake.dbs["u-pg"]
+	db.Destination = coolify.Destination{Network: "live-net", Server: coolify.Server{UUID: "srv-1", Name: "localhost"}}
+	fake.dbs["u-pg"] = db
+
+	if _, err := Run(context.Background(), fake, Options{Dir: dir, DefaultNetwork: "fallback-net"}); err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	for file, wantNet := range map[string]string{
+		"environments/staging/applications/api.yaml":         "live-net",
+		"environments/staging/databases/pg-api-staging.yaml": "live-net",
+		"environments/staging/applications/worker.yaml":      "fallback-net",
+	} {
+		body, err := os.ReadFile(filepath.Join(dir, file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(body), "network: "+wantNet) {
+			t.Errorf("%s: want network %q, got:\n%s", file, wantNet, body)
+		}
+	}
+}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -41,5 +42,27 @@ func TestDestroyCommand_DryRunOfflineListsResources(t *testing.T) {
 	}
 	if indexOfContaining(got.Operations, "delete Application") < 0 {
 		t.Errorf("operations = %v, want a delete Application op", got.Operations)
+	}
+}
+
+// TestDestroyCommand_UnresolvedDestinationEnv proves destroy never needs ${env:} values:
+// the destination is irrelevant to a delete (resources are resolved by name), so a manifest
+// whose destination.server references an unset variable still tears down cleanly. This is
+// the first half of the only supported server-move choreography (destroy, then re-apply).
+func TestDestroyCommand_UnresolvedDestinationEnv(t *testing.T) {
+	clearCoolifyEnv(t)
+	srv, calls := destinationMux(t)
+	t.Setenv("COOLIFY_API_TOKEN", "tok")
+
+	manifest := strings.Replace(movedAppManifest, "server: hetzner-1", `server: "${env:UNSET_DESTROY_SERVER}"`, 1)
+	out, err := runCmd(t, "destroy", writeManifestDir(t, manifest),
+		"--env", "staging", "--auto-approve", "--output=json",
+		"--coolify-url", srv.URL, "--openapi-dir", openapiDir(),
+		"--audit-log", filepath.Join(t.TempDir(), "audit.log"))
+	if err != nil {
+		t.Fatalf("destroy with an unresolved destination env: %v\n%s", err, out)
+	}
+	if indexOfContaining(*calls, "DELETE /api/v1/applications/u-web") < 0 {
+		t.Errorf("expected the application DELETE call, got %v", *calls)
 	}
 }

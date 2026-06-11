@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `plan` now diffs `destination.server` and `destination.network` for applications and
+  databases, projecting the server's logical name (never its UUID). A destination change is
+  rendered as `-/+ <Kind>.<name> must be recreated (destination changed: …)` in text and
+  marked with `"requires_recreate": true` on the item (and the change) in JSON, distinct
+  from an ordinary update.
+- `apply` fails fast when an existing resource has a destination drift:
+  `cannot move <kind> "<name>" to server "<server>": destroy it first, then re-apply` —
+  no partial PATCH is emitted, so a server migration can never be silently half-applied.
+- `import` now writes the network reported by the live destination payload;
+  `--default-network` only fills the gap when the payload omits one.
+
+### Changed
+
+- A visible (Param) field whose desired value still carries an unresolved `${env:VAR}`
+  reference is treated as stable by the `plan` diff (references are bound at `apply` only),
+  so parameterised manifests plan clean without the variables set — mirroring how unresolved
+  secret references already behaved.
+
 ### Fixed
 
 - GitLab CI template: `.iac-coolify-plan` no longer forces `--detailed-exitcode`. A plan

@@ -229,6 +229,9 @@ func TestGetDatabase_decodesObservedShape(t *testing.T) {
 	if db.Destination.Network != "coolify" {
 		t.Errorf("Destination.Network = %q, want coolify", db.Destination.Network)
 	}
+	if db.Destination.Server.Name != "localhost" {
+		t.Errorf("Destination.Server.Name = %q, want localhost", db.Destination.Server.Name)
+	}
 
 	// Credential fields decode into opaque secrets: present, redacted, never in clear.
 	if db.PostgresPassword.IsZero() {
@@ -247,6 +250,40 @@ func TestGetDatabase_decodesObservedShape(t *testing.T) {
 		if strings.Contains(blob, leak) {
 			t.Errorf("credential value %q leaked through a string representation", leak)
 		}
+	}
+}
+
+// TestGetApplication_decodesDestination pins the observed GET /applications/{uuid}
+// destination shape: the hosting server lives in destination.server (the top-level
+// "server" field is null at runtime), and the network in destination.network.
+func TestGetApplication_decodesDestination(t *testing.T) {
+	golden, err := os.ReadFile(filepath.Join("testdata", "application-singular.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(golden)
+	}))
+	defer srv.Close()
+
+	app, err := newTestClient(t, srv.URL).GetApplication(context.Background(), "app-abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != "/api/v1/applications/app-abc" {
+		t.Errorf("path = %q, want /api/v1/applications/app-abc", gotPath)
+	}
+	if app.Name != "restaurant-core-api-staging" {
+		t.Errorf("Name = %q", app.Name)
+	}
+	if app.Destination.Server.Name != "localhost" {
+		t.Errorf("Destination.Server.Name = %q, want localhost", app.Destination.Server.Name)
+	}
+	if app.Destination.Network != "coolify" {
+		t.Errorf("Destination.Network = %q, want coolify", app.Destination.Network)
 	}
 }
 

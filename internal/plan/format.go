@@ -17,12 +17,15 @@ const (
 	ActionNoop Action = "noop"
 )
 
-// Item is one resource's planned change.
+// Item is one resource's planned change. RequiresRecreate is set when at least one change
+// cannot be patched in place (a destination move): the resource keeps Action update in the
+// summary counts, but converging it takes a destroy followed by a fresh apply.
 type Item struct {
-	Kind    string   `json:"kind"`
-	Name    string   `json:"name"`
-	Action  Action   `json:"action"`
-	Changes []Change `json:"changes"`
+	Kind             string   `json:"kind"`
+	Name             string   `json:"name"`
+	Action           Action   `json:"action"`
+	RequiresRecreate bool     `json:"requires_recreate"`
+	Changes          []Change `json:"changes"`
 }
 
 // Plan aggregates the per-resource diffs of a run.
@@ -40,7 +43,14 @@ func (p *Plan) Add(desired Resource, actual *Resource) {
 	case len(changes) > 0:
 		action = ActionUpdate
 	}
-	p.Items = append(p.Items, Item{Kind: desired.Kind, Name: desired.Name, Action: action, Changes: changes})
+	recreate := false
+	for _, c := range changes {
+		if c.RequiresRecreate {
+			recreate = true
+			break
+		}
+	}
+	p.Items = append(p.Items, Item{Kind: desired.Kind, Name: desired.Name, Action: action, RequiresRecreate: recreate, Changes: changes})
 }
 
 // Summary counts resources by outcome (Terraform-style).
@@ -104,7 +114,11 @@ func (p Plan) RenderText() string {
 		case ActionCreate:
 			fmt.Fprintf(&b, "+ %s.%s will be created\n", it.Kind, it.Name)
 		case ActionUpdate:
-			fmt.Fprintf(&b, "~ %s.%s will be updated\n", it.Kind, it.Name)
+			if it.RequiresRecreate {
+				fmt.Fprintf(&b, "-/+ %s.%s must be recreated (%s)\n", it.Kind, it.Name, recreateNote(it.Changes))
+			} else {
+				fmt.Fprintf(&b, "~ %s.%s will be updated\n", it.Kind, it.Name)
+			}
 		}
 		for _, c := range it.Changes {
 			b.WriteString(renderChange(c))
@@ -113,6 +127,24 @@ func (p Plan) RenderText() string {
 	s := p.Summary()
 	fmt.Fprintf(&b, "\nPlan: %d to add, %d to change, %d to destroy.\n", s.Add, s.Change, s.Destroy)
 	return b.String()
+}
+
+// recreateNote summarises why a resource must be recreated: each non-patchable change
+// (destination move) is listed by its last path segment with its old and new value, e.g.
+// `destination changed: server "localhost" -> "hetzner-1"`.
+func recreateNote(changes []Change) string {
+	var parts []string
+	for _, c := range changes {
+		if !c.RequiresRecreate {
+			continue
+		}
+		label := c.Path
+		if i := strings.LastIndex(label, "."); i >= 0 {
+			label = label[i+1:]
+		}
+		parts = append(parts, fmt.Sprintf("%s %q -> %q", label, c.Old, c.New))
+	}
+	return "destination changed: " + strings.Join(parts, ", ")
 }
 
 func renderChange(c Change) string {

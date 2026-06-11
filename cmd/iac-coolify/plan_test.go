@@ -59,7 +59,8 @@ func coolifyMux(t *testing.T, fqdn string) *httptest.Server {
 	t.Helper()
 	app := `{"uuid":"u-web","name":"web","environment_id":10,` +
 		`"fqdn":"` + fqdn + `","ports_exposes":"3000",` +
-		`"docker_registry_image_name":"registry.example.com/demo/web","docker_registry_image_tag":"v1-0-0"}`
+		`"docker_registry_image_name":"registry.example.com/demo/web","docker_registry_image_tag":"v1-0-0",` +
+		`"server":null,"destination":{"uuid":"d-1","name":"coolify","network":"coolify","server":{"uuid":"srv-1","name":"localhost"}}}`
 	bodies := map[string]string{
 		"/api/v1/projects":                 `[{"id":1,"uuid":"p1","name":"demo"}]`,
 		"/api/v1/projects/p1/environments": `[{"id":10,"name":"staging"}]`,

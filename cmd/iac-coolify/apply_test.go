@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -181,4 +182,129 @@ func TestApplyCommand_PartialFailureExitsTwo(t *testing.T) {
 	if !asExit(err, &ec) || ec.ExitCode() != 2 {
 		t.Fatalf("want exit code 2 (partial), got %v", err)
 	}
+}
+
+// destinationMux serves a live instance hosting one application ("web") and one database
+// ("pg") on server "localhost", recording every request as "METHOD path" so a mutation
+// attempt is visible to the test.
+func destinationMux(t *testing.T) (*httptest.Server, *[]string) {
+	t.Helper()
+	destination := `"destination":{"uuid":"d-1","name":"coolify","network":"coolify","server":{"uuid":"srv-1","name":"localhost"}}`
+	app := `{"uuid":"u-web","name":"web","environment_id":10,"fqdn":"https://web.example.com","ports_exposes":"3000",` +
+		`"docker_registry_image_name":"registry.example.com/demo/web","docker_registry_image_tag":"v1-0-0","server":null,` + destination + `}`
+	db := `{"uuid":"db-pg","name":"pg","image":"postgres:18-alpine","is_public":false,"public_port":5432,` +
+		`"limits_cpu_shares":1024,"limits_memory":"0","postgres_password":"x","status":"running:healthy",` + destination + `}`
+	bodies := map[string]string{
+		"/api/v1/projects":                 `[{"id":1,"uuid":"p1","name":"demo"}]`,
+		"/api/v1/projects/p1/environments": `[{"id":10,"name":"staging"}]`,
+		"/api/v1/servers":                  `[{"uuid":"srv-1","name":"localhost"},{"uuid":"srv-2","name":"hetzner-1"}]`,
+		"/api/v1/applications":             `[` + app + `]`,
+		"/api/v1/applications/u-web":       app,
+		"/api/v1/services":                 `[]`,
+		"/api/v1/servers/srv-1/resources":  `[{"id":1,"uuid":"db-pg","name":"pg","type":"standalone-postgresql","status":"running:healthy","created_at":"","updated_at":""}]`,
+		"/api/v1/servers/srv-2/resources":  `[]`,
+		"/api/v1/databases/db-pg":          db,
+	}
+	var calls []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		body, ok := bodies[r.URL.Path]
+		if !ok {
+			t.Errorf("unexpected path %q", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &calls
+}
+
+// movedAppManifest declares the live "web" application on a different server.
+const movedAppManifest = `api_version: iac-coolify/v1
+kind: Application
+metadata:
+  name: web
+  project: demo
+  environment: staging
+spec:
+  build_pack: dockerimage
+  image:
+    name: registry.example.com/demo/web
+    tag: v1-0-0
+  destination:
+    server: hetzner-1
+    network: coolify
+  fqdn: https://web.example.com
+  port: 3000
+`
+
+// movedDBManifest declares the live "pg" database on a different server.
+const movedDBManifest = `api_version: iac-coolify/v1
+kind: Database
+metadata:
+  name: pg
+  project: demo
+  environment: staging
+spec:
+  engine: postgresql
+  image: postgres:18-alpine
+  destination:
+    server: hetzner-1
+    network: coolify
+`
+
+func writeManifestDir(t *testing.T, manifest string) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "resource.yaml"), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func assertNoMutation(t *testing.T, calls []string) {
+	t.Helper()
+	for _, c := range calls {
+		if !strings.HasPrefix(c, "GET ") {
+			t.Errorf("mutation emitted despite the fail-fast guard: %s", c)
+		}
+	}
+}
+
+func TestApplyCommand_ApplicationDestinationMoveFailsFast(t *testing.T) {
+	clearCoolifyEnv(t)
+	srv, calls := destinationMux(t)
+	t.Setenv("COOLIFY_API_TOKEN", "tok")
+
+	_, err := runCmd(t, "apply", writeManifestDir(t, movedAppManifest),
+		"--coolify-url", srv.URL, "--auto-approve", "--output=json",
+		"--openapi-dir", openapiDir(), "--audit-log", filepath.Join(t.TempDir(), "audit.log"))
+	if err == nil {
+		t.Fatal("apply with a destination move must fail fast")
+	}
+	want := `cannot move application "web" to server "hetzner-1"`
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("error = %v, want it to contain %q", err, want)
+	}
+	assertNoMutation(t, *calls)
+}
+
+func TestApplyCommand_DatabaseDestinationMoveFailsFast(t *testing.T) {
+	clearCoolifyEnv(t)
+	srv, calls := destinationMux(t)
+	t.Setenv("COOLIFY_API_TOKEN", "tok")
+
+	_, err := runCmd(t, "apply", writeManifestDir(t, movedDBManifest),
+		"--coolify-url", srv.URL, "--auto-approve", "--output=json",
+		"--openapi-dir", openapiDir(), "--audit-log", filepath.Join(t.TempDir(), "audit.log"))
+	if err == nil {
+		t.Fatal("apply with a database destination move must fail fast")
+	}
+	want := `cannot move database "pg" to server "hetzner-1"`
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("error = %v, want it to contain %q", err, want)
+	}
+	assertNoMutation(t, *calls)
 }

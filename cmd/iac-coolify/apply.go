@@ -285,10 +285,26 @@ func applicationOp(ctx context.Context, client *coolify.Client, resolved state.M
 	if actual == nil {
 		return apply.ApplicationOp(apply.OpCreate, app, changes), true, nil
 	}
+	if err := destinationMoveError("application", app.Metadata.Name, app.Spec.Destination.Server, changes); err != nil {
+		return apply.Operation{}, false, err
+	}
 	if len(changes) == 0 {
 		return apply.Operation{}, false, nil
 	}
 	return apply.ApplicationOp(apply.OpUpdate, app, changes), true, nil
+}
+
+// destinationMoveError fails fast when an existing resource has a destination drift: the
+// Coolify API has no in-place server move, so a PATCH would update every other field while
+// silently leaving the resource on its old server — pretending the move happened. No update
+// is emitted; the operator must destroy the resource and re-apply it on the new destination.
+func destinationMoveError(kind, name, server string, changes []plan.Change) error {
+	for _, c := range changes {
+		if c.RequiresRecreate {
+			return fmt.Errorf("cannot move %s %q to server %q: destroy it first, then re-apply (Coolify has no in-place server move)", kind, name, server)
+		}
+	}
+	return nil
 }
 
 // databaseOps diffs each database against its live state and returns the operations needed
@@ -320,6 +336,9 @@ func databaseOp(ctx context.Context, client *coolify.Client, resolved state.Map,
 	changes := plan.Diff(plan.FromDatabase(db), actual)
 	if actual == nil {
 		return apply.DatabaseOp(apply.OpCreate, db, changes), true, nil
+	}
+	if err := destinationMoveError("database", db.Metadata.Name, db.Spec.Destination.Server, changes); err != nil {
+		return apply.Operation{}, false, err
 	}
 	if len(changes) == 0 {
 		return apply.Operation{}, false, nil

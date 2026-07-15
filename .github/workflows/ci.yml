@@ -11,7 +11,7 @@ permissions:
 # Same toolchain as the Makefile pin — setup-go's '1.25' resolves to whatever
 # patch the runner manifest carries, which can lag behind stdlib advisories.
 env:
-  GOTOOLCHAIN: go1.25.11
+  GOTOOLCHAIN: go1.25.12
 
 jobs:
   lint:

@@ -9,10 +9,10 @@ GOPATH_BIN := $(shell $(GO) env GOPATH)/bin
 VERSION   ?= $(shell git describe --tags --match='v*.*.*' --always --dirty 2>/dev/null || echo dev)
 LDFLAGS   := -s -w -X main.version=$(VERSION)
 
-# Single toolchain across every step. go1.25.11 is the current patch line govulncheck
+# Single toolchain across every step. go1.25.12 is the current patch line govulncheck
 # reports free of stdlib advisories; golangci-lint v2 (built with go >= 1.25) analyses
 # against it directly. Overridable, e.g. `make GOTOOLCHAIN=local test`.
-GOTOOLCHAIN ?= go1.25.11
+GOTOOLCHAIN ?= go1.25.12
 export GOTOOLCHAIN
 
 .PHONY: all build release-dry test lint fmt fmt-check vet vuln verify clean tools

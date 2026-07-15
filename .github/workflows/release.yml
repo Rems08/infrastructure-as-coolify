@@ -10,7 +10,7 @@ permissions:
 # Same toolchain as the Makefile pin — the released binaries must be built on
 # the patch line that is free of stdlib advisories.
 env:
-  GOTOOLCHAIN: go1.25.11
+  GOTOOLCHAIN: go1.25.12
 
 jobs:
   goreleaser:

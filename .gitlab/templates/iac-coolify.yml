@@ -1,7 +1,7 @@
 # Reusable iac-coolify CI/CD template. Include it and extend the jobs you need:
 #
 #   include:
-#     - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.5/.gitlab/templates/iac-coolify.yml"
+#     - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.6/.gitlab/templates/iac-coolify.yml"
 #
 #   plan:
 #     extends: .iac-coolify-plan
@@ -18,7 +18,7 @@
 # slim shell image and verify its checksum before running it.
 
 variables:
-  IAC_COOLIFY_VERSION: "0.1.5"
+  IAC_COOLIFY_VERSION: "0.1.6"
   IAC_COOLIFY_ARCH: "amd64"
   IAC_COOLIFY_PATH: "."
   # Extra flags such as --target <name> or --env <name>; left empty by default.

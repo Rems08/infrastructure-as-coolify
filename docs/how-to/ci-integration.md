@@ -34,7 +34,7 @@ Include the reusable template and extend the jobs you need:
 
 ```yaml
 include:
-  - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.5/.gitlab/templates/iac-coolify.yml"
+  - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.6/.gitlab/templates/iac-coolify.yml"
 
 plan:
   extends: .iac-coolify-plan
@@ -94,7 +94,7 @@ this — nothing tool-specific is required:
 
 ```yaml
 include:
-  - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.5/.gitlab/templates/iac-coolify.yml"
+  - remote: "https://raw.githubusercontent.com/Rems08/infrastructure-as-coolify/v0.1.6/.gitlab/templates/iac-coolify.yml"
 
 # Every MR shows the diff for the environment it targets (job is green on no-op).
 plan:staging:

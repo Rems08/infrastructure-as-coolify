@@ -10,11 +10,11 @@ only be bumped *after* the workflow has run. Follow the steps in order.
 - `CHANGELOG.md` has a `## [X.Y.Z] - YYYY-MM-DD` section cut from `[Unreleased]`,
   and the comparison links at the bottom are updated.
 - Every self-reference to the previous version is bumped
-  (`docs/how-to/ci-integration.md`, `docs/tutorials/getting-started.md`,
-  `docs/how-to/install.md`, `.gitlab/templates/iac-coolify.yml` →
-  `IAC_COOLIFY_VERSION`). The **only** reference left on the old version at tag
-  time is `.github/action/Dockerfile` (step 4). The Homebrew cask is **not** on
-  this list — goreleaser bumps it automatically (see below).
+  (`docs/how-to/ci-integration.md`, `docs/how-to/install.md`,
+  `.gitlab/templates/iac-coolify.yml` → `IAC_COOLIFY_VERSION`). The **only**
+  reference left on the old version at tag time is
+  `.github/action/Dockerfile` (step 4). The Homebrew cask is **not** on this
+  list — goreleaser bumps it automatically (see below).
 
 ## Sequence
 

@@ -22,8 +22,10 @@ way Terraform manages cloud resources — but native to Coolify, with Kubernetes
 This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 
 - **Tutorials** — a hands-on getting-started lesson.
-- **How-to guides** — recipes for specific tasks: selecting environments, managing
-  databases, interpolation, secrets, and running in CI.
+- **How-to guides** — recipes for specific tasks: installing and verifying releases,
+  selecting environments, managing databases, moving resources between servers,
+  interpolation, secrets, importing an existing instance, exploring interactively, and
+  running in CI.
 - **Reference** — the generated resource schemas (`Project`, `Environment`,
   `Application`, `Service`, `Database`, `EnvVar`).
 - **Explanation** — the why behind the tool and its configuration model.

@@ -9,18 +9,39 @@ yet, and write-back never pushes to Coolify — run `iac-coolify apply` for that
 
 ## Prerequisites
 
-`explore` browses the remote instance, so — unlike `plan` — it has no offline mode and
-requires credentials:
+`explore` requires an interactive terminal — in a pipe or CI it exits with an error rather
+than opening a UI. Credentials can come from the environment, or be entered in the
+[connection wizard](#connection-wizard) when they are missing:
 
 ```bash
 export COOLIFY_API_URL=https://coolify.example.com
-export COOLIFY_API_TOKEN=...
-iac-coolify explore             # browse only
-iac-coolify explore ./coolify   # browse + drift against the config under ./coolify
+export COOLIFY_API_TOKEN=...        # set both to skip the connection wizard
+iac-coolify explore                 # browse only
+iac-coolify explore ./coolify       # browse + drift against the config under ./coolify
 ```
 
-If either variable is missing, or you are running in a pipe or in CI (no interactive
-terminal), `explore` exits with an explanatory error instead of opening a UI.
+## Connection wizard
+
+When no credentials are in the environment, `explore` opens a **connection wizard** instead of
+refusing to start: enter the Coolify URL, the API token, and an optional Cloudflare Access pair
+(Client ID + Secret). The token and the CF-Access secret are masked as you type, and `enter`
+tests the connection before opening the browser — a bad URL or token keeps the wizard open with
+the (redacted) error so you can fix it. The entered values are used for the session only: they
+are never written to disk and never logged. `esc` quits without connecting.
+
+## Starting in an empty directory
+
+When `explore` starts in a directory that holds no resource manifests, it opens an onboarding
+menu instead of an empty tree:
+
+- `[S]ync` imports the live instance into local YAML — the same reverse-engineering as
+  [`iac-coolify import`](import-existing.md), writing `${env:…}` references (never secret
+  values) and printing a report. After a sync the desired config is loaded straight away, so
+  drift and the desired comparison work in the same session; if manifests already exist a sync
+  asks before overwriting them (`[y/N]`).
+- `[I]nit` scaffolds an empty root `coolify.yaml`.
+- `[B]rowse` opens the live tree without any local config.
+- `[Q]uit` exits.
 
 ## Keys
 
@@ -28,14 +49,64 @@ terminal), `explore` exits with an explanatory error instead of opening a UI.
 |--------------------|-------------------------------------------------------|
 | `↑`/`↓`, `k`/`j`   | move the cursor                                       |
 | `↵`                | expand/collapse a container, or open a resource       |
-| `esc`/`backspace`  | collapse the node, or jump to its parent              |
+| `esc`/`backspace`  | close the active pane (logs, drift, detail), else collapse or jump to the parent |
 | `r`                | reveal/hide masked environment-variable values        |
 | `D`                | drift: compare the selected application with its config |
 | `R`/`S`/`U`        | restart / stop / start the selected application (asks `[y/N]`) |
 | `e`                | edit the selected desired env var                     |
 | `s`/`d`            | save edits back to YAML / discard them                |
+| `/`                | filter env vars by key (`esc` clears the filter)      |
 | `L`                | toggle the log pane                                   |
 | `q`/`ctrl+c`       | quit                                                  |
+
+## What each resource shows
+
+- **Service** — its live environment variables as a table. Every value is **masked**
+  (`••••••`) until you press `r`; pressing it again re-masks them. Revealing is a view toggle
+  on values the read API already returns in cleartext — nothing is decrypted, logged or
+  written.
+- **Application** — its structural fields (status, image, build pack, …) and, when a config
+  path is given and a desired Application matches by `(environment, name)`, an **ENV VARS
+  (desired)** section read from the YAML. A plain value is masked until you press `r`; a
+  secret is shown only by its source declaration (`${env:NAME}` / `${sops:path}`) next to a
+  🔒 marker. The resolved secret value is never read or displayed — `r` reveals plain values,
+  never a secret. When no desired Application matches the selected name (or no config path was
+  given), the section says so rather than failing. These rows can be edited and written back to
+  YAML — see [Editing desired env vars](#editing-desired-env-vars).
+- **Database** — its structural fields (status, type, …) only; no environment-variable table
+  on the read path, so the mask toggle does not apply.
+
+Databases that Coolify exposes only through the per-server resource listing carry no
+project or environment, so they appear under a single top-level `databases` group rather
+than nested under a project.
+
+## Comparing desired and live env vars
+
+An application's desired section is compared against its **live** env vars, joined by name and
+summarised in the header as `N tracked · N only-local · N only-remote`. The comparison is by
+**presence**, not value (a desired value is often a `${env:…}` reference, not a resolved value,
+so a value-to-value diff would be meaningless):
+
+- a name found on both sides is `tracked` and shows the live value beside the desired one
+  (masked until `r`);
+- a desired name with no live counterpart is `only-local`;
+- live env vars with no desired counterpart — what is left to capture as IaC — are listed
+  read-only under **ENV VARS (only on remote)** and tagged `only-remote`.
+
+If the live env listing fails, the fields and desired section still load and the comparison is
+reported as unavailable. Live values are masked by default like everything else.
+
+Coolify scopes each live env var as buildtime, runtime, or both, so rows carry a scope tag
+(`KEY [build]`, `KEY [runtime]`, `KEY [build,runtime]`). The same key in two scopes is a genuine
+variant and is kept as two rows; exact `(key, scope)` duplicates are collapsed, and a collapsed
+pair that disagreed on its value is flagged `⚠ conflicting values` (the value itself is never
+shown). The only-remote presence count is by unique key, so a key present in both scopes counts
+once.
+
+Press `/` to filter the env lists by a key substring (case-insensitive — keys only, never
+values); the header shows `filter: <query> (matched/total)` and `esc` clears it. A long
+only-remote list scrolls within a fixed window with `↑ N more`/`↓ N more` markers: `↓`/`j` runs
+the cursor through the editable desired rows and then scrolls the list, `↑`/`k` scrolls back.
 
 ## Drift
 
@@ -76,27 +147,6 @@ temp-file-then-rename and records a `write-back` entry to the audit log; `d` dis
 staged edits and restores the on-disk values. Quitting with unsaved edits asks for
 confirmation first. The write-back edits the **desired** YAML only — it does not push to
 Coolify, so run `iac-coolify apply` to reconcile the live instance afterwards.
-
-## What each resource shows
-
-- **Service** — its live environment variables as a table. Every value is **masked**
-  (`••••••`) until you press `r`; pressing it again re-masks them. Revealing is a view toggle
-  on values the read API already returns in cleartext — nothing is decrypted, logged or
-  written.
-- **Application** — its structural fields (status, image, build pack, …) and, when a config
-  path is given and a desired Application matches by `(environment, name)`, an **ENV VARS
-  (desired)** section read from the YAML. A plain value is masked until you press `r`; a
-  secret is shown only by its source declaration (`${env:NAME}` / `${sops:path}`) next to a
-  🔒 marker. The resolved secret value is never read or displayed — `r` reveals plain values,
-  never a secret. When no desired Application matches the selected name (or no config path was
-  given), the section says so rather than failing. These rows can be edited and written back to
-  YAML — see [Editing desired env vars](#editing-desired-env-vars).
-- **Database** — its structural fields (status, type, …) only; no environment-variable table
-  on the read path, so the mask toggle does not apply.
-
-Databases that Coolify exposes only through the per-server resource listing carry no
-project or environment, so they appear under a single top-level `databases` group rather
-than nested under a project.
 
 ## Logs
 

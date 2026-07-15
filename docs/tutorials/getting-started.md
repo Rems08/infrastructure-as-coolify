@@ -5,7 +5,14 @@ instance, using the bundled `examples/minimal/` configuration.
 
 ## 1. Install
 
-Download a binary for your platform from the
+On macOS or Linux, install through Homebrew (this repository is also the tap):
+
+```sh
+brew tap rems08/iac-coolify https://github.com/Rems08/infrastructure-as-coolify
+brew install --cask iac-coolify
+```
+
+Alternatively, download a binary from the
 [releases page](https://github.com/Rems08/infrastructure-as-coolify/releases), or pull the
 container image:
 
@@ -14,8 +21,8 @@ docker pull ghcr.io/rems08/infrastructure-as-coolify:latest
 docker run --rm ghcr.io/rems08/infrastructure-as-coolify version
 ```
 
-Images are multi-arch (`linux/amd64`, `linux/arm64`). Replace `:latest` with a version such
-as `:0.1.4` to pin a release.
+Every option — including `go install` and signature verification — is covered in
+[Install](../how-to/install.md).
 
 ## 2. Validate a configuration
 

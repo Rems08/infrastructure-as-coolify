@@ -19,6 +19,7 @@ jobs:
       contents: write
       packages: write
       id-token: write
+      pull-requests: write
     outputs:
       hashes: ${{ steps.hash.outputs.hashes }}
     steps:
@@ -42,11 +43,30 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CASK_PR_TOKEN: ${{ secrets.CASK_PR_TOKEN }}
       # checksums.txt lists every archive's SHA-256, so its base64 is the
       # subject set the provenance generator signs over.
       - name: Generate provenance subjects
         id: hash
         run: echo "hashes=$(base64 -w0 dist/checksums.txt)" >> "$GITHUB_OUTPUT"
+      # goreleaser opened the cask PR with CASK_PR_TOKEN so CI runs on it.
+      # Auto-merge is enabled with the default token: github-actions has no
+      # ruleset bypass, so the merge waits for the required lint/test checks.
+      # The fallback direct merge covers a PR whose checks already passed,
+      # where enabling auto-merge is rejected as a no-op.
+      - name: Auto-merge the Homebrew cask PR
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="cask-update-${GITHUB_REF_NAME#v}"
+          pr="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq '.[0].number')"
+          if [ -z "$pr" ]; then
+            echo "no open cask PR with head branch $branch" >&2
+            exit 1
+          fi
+          gh pr merge "$pr" --auto --squash --repo "$GITHUB_REPOSITORY" \
+            || gh pr merge "$pr" --squash --repo "$GITHUB_REPOSITORY"
 
   provenance:
     needs: [goreleaser]

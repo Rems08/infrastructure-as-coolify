@@ -9,11 +9,12 @@ only be bumped *after* the workflow has run. Follow the steps in order.
 - `main` is green (CI + `make verify`) and contains everything the release ships.
 - `CHANGELOG.md` has a `## [X.Y.Z] - YYYY-MM-DD` section cut from `[Unreleased]`,
   and the comparison links at the bottom are updated.
-- Every self-reference to the previous version is bumped (`README.md`,
-  `docs/how-to/ci-integration.md`, `docs/tutorials/getting-started.md`,
-  `.gitlab/templates/iac-coolify.yml` → `IAC_COOLIFY_VERSION`). The **only**
-  reference left on the old version at tag time is
-  `.github/action/Dockerfile` (step 4).
+- Every self-reference to the previous version is bumped
+  (`docs/how-to/ci-integration.md`, `docs/tutorials/getting-started.md`,
+  `docs/how-to/install.md`, `.gitlab/templates/iac-coolify.yml` →
+  `IAC_COOLIFY_VERSION`). The **only** reference left on the old version at tag
+  time is `.github/action/Dockerfile` (step 4). The Homebrew cask is **not** on
+  this list — goreleaser bumps it automatically (see below).
 
 ## Sequence
 
@@ -38,6 +39,14 @@ only be bumped *after* the workflow has run. Follow the steps in order.
      --certificate-oidc-issuer https://token.actions.githubusercontent.com
    ```
 
+   The workflow also opens the Homebrew cask PR (head branch
+   `cask-update-X.Y.Z`) and enables auto-merge on it; confirm it merged once
+   CI passed:
+
+   ```sh
+   gh pr list --repo Rems08/infrastructure-as-coolify --head cask-update-X.Y.Z --state all
+   ```
+
 3. **If the workflow failed** after publishing *any* artifact: do **not** delete
    and re-push the tag. Tags are immutable once an artifact shipped — fix the
    problem and release `X.Y.Z+1` (or the next `-rc.N`). A tag may only be
@@ -59,6 +68,39 @@ only be bumped *after* the workflow has run. Follow the steps in order.
 6. **Smoke-check the consumers**: the GitLab template downloads the release
    binary by version (`IAC_COOLIFY_VERSION`), the action builds from the GHCR
    image — both must resolve the new version.
+
+## Homebrew cask
+
+This repository doubles as the Homebrew tap: goreleaser renders
+`Casks/iac-coolify.rb` from the release archives, pushes it to a branch named
+`cask-update-X.Y.Z` using the `CASK_PR_TOKEN` secret, and opens a PR to `main`.
+The release workflow then enables **squash auto-merge** on that PR with the
+default Actions token, so it merges itself once the required `lint` and `test`
+checks pass. Prerelease tags (any tag containing `-`) skip the cask entirely.
+
+- The PR must be opened with a personal access token: a PR created by the
+  default `GITHUB_TOKEN` never triggers workflows, so CI would not run and the
+  auto-merge would wait forever.
+- If a cask PR is still open when the next release is cut (e.g. its CI was
+  red), **close it first** — two open cask PRs edit the same file and the
+  second cannot merge cleanly.
+- If the cask PR was never opened, check the goreleaser log: a cask publish
+  failure is logged but does not fail the pipeline, while the auto-merge step
+  fails loudly when it finds no PR.
+
+### One-time setup
+
+- `CASK_PR_TOKEN` actions secret: a **fine-grained PAT** scoped to this
+  repository only, with **Contents: Read and write** and **Pull requests: Read
+  and write**. Store it with
+  `gh secret set CASK_PR_TOKEN --repo Rems08/infrastructure-as-coolify`.
+- Fine-grained PATs expire (366 days max). An expired token fails the release
+  *after* the archives and images shipped; per the immutability rule above,
+  rotate the secret and ship `X.Y.Z+1` (or push the cask commit by hand).
+- Repository settings: **Allow auto-merge** enabled, and the `main` ruleset
+  requires the `lint` and `test` status checks (with an admin bypass so
+  maintainers can still push directly to `main`). Without required checks,
+  enabling auto-merge would merge the PR instantly, before CI.
 
 ## Notes
 

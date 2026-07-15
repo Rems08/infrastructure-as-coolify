@@ -68,6 +68,7 @@ func TestSanitizeEnvName(t *testing.T) {
 func TestMapApplication_DockerimageComplete(t *testing.T) {
 	app := coolify.Application{
 		Name:                    "api",
+		Description:             "core API",
 		FQDN:                    "https://api.example.com",
 		BuildPack:               "dockerimage",
 		DockerRegistryImageName: "registry/api",
@@ -84,6 +85,9 @@ func TestMapApplication_DockerimageComplete(t *testing.T) {
 	}
 	if mapped.Spec.Image == nil || mapped.Spec.Image.Name != "registry/api" || mapped.Spec.Port != 8000 {
 		t.Errorf("image/port mapping wrong: %+v port=%d", mapped.Spec.Image, mapped.Spec.Port)
+	}
+	if mapped.Spec.Description != "core API" {
+		t.Errorf("description mapping wrong: %q", mapped.Spec.Description)
 	}
 	if mapped.Spec.Destination.Server != "localhost" || mapped.Spec.Destination.Network != "coolify" {
 		t.Errorf("destination mapping wrong: %+v", mapped.Spec.Destination)

@@ -39,6 +39,7 @@ type envRef struct {
 func mapApplication(app coolify.Application, server, network string, env envRef, envs []coolify.ServiceEnvVar) (resource.Application, []string) {
 	hasImage := app.DockerRegistryImageName != ""
 	spec := resource.ApplicationSpec{
+		Description: app.Description,
 		BuildPack:   mapBuildPack(app.BuildPack, hasImage),
 		Destination: resource.DestinationRef{Server: server, Network: network},
 		FQDN:        app.FQDN,
@@ -89,6 +90,7 @@ func mapDatabase(db coolify.Database, server, network string, env envRef) (resou
 		return resource.Database{}, "", err
 	}
 	spec := resource.DatabaseSpec{
+		Description: db.Description,
 		Engine:      engine,
 		Image:       db.Image,
 		Destination: resource.DestinationRef{Server: server, Network: network},

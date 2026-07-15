@@ -50,6 +50,7 @@ type ApplicationMeta struct {
 
 // ApplicationSpec is the desired state of an application.
 type ApplicationSpec struct {
+	Description string           `yaml:"description,omitempty" json:"description,omitempty" iac:"doc=Human-readable application description"`
 	BuildPack   string           `yaml:"build_pack" json:"build_pack" iac:"doc=Build pack to use,required,enum=dockerfile|dockerimage|nixpacks|docker-compose|static|railpack"`
 	Image       *ImageSpec       `yaml:"image,omitempty" json:"image,omitempty" iac:"doc=Docker image (required when build_pack is dockerimage)"`
 	Dockerfile  string           `yaml:"dockerfile,omitempty" json:"dockerfile,omitempty" iac:"doc=Inline Dockerfile content for build_pack dockerfile in inline mode; mutually exclusive with source"`

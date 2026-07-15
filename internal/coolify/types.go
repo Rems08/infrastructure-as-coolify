@@ -13,6 +13,7 @@ import "github.com/Rems08/infrastructure-as-coolify/internal/secrets"
 type Application struct {
 	UUID                    string `json:"uuid"`
 	Name                    string `json:"name"`
+	Description             string `json:"description"`
 	FQDN                    string `json:"fqdn"`
 	BuildPack               string `json:"build_pack"`
 	DockerRegistryImageName string `json:"docker_registry_image_name"`
@@ -172,6 +173,7 @@ type CreateApplicationRequest struct {
 	ServerUUID              string `json:"server_uuid"`
 	EnvironmentName         string `json:"environment_name,omitempty"`
 	Name                    string `json:"name,omitempty"`
+	Description             string `json:"description,omitempty"`
 	Domains                 string `json:"domains,omitempty"`
 	PortsExposes            string `json:"ports_exposes,omitempty"`
 	DockerRegistryImageName string `json:"docker_registry_image_name,omitempty"`
@@ -184,6 +186,7 @@ type CreateApplicationRequest struct {
 // UpdateApplicationRequest is the partial body sent to PATCH /applications/{uuid}. Only
 // the non-empty fields are sent, so the engine can update just what the diff changed.
 type UpdateApplicationRequest struct {
+	Description             string `json:"description,omitempty"`
 	Domains                 string `json:"domains,omitempty"`
 	PortsExposes            string `json:"ports_exposes,omitempty"`
 	DockerRegistryImageName string `json:"docker_registry_image_name,omitempty"`

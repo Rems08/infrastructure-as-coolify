@@ -49,6 +49,9 @@
     },
     "DatabaseSpec": {
       "properties": {
+        "description": {
+          "type": "string"
+        },
         "engine": {
           "type": "string"
         },

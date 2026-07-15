@@ -199,6 +199,7 @@ func TestApplyUpdateMapsChangedFields(t *testing.T) {
 	resolved := serverResolved()
 	resolved[state.ResourceKey{Project: "beenaire", Environment: "staging", Kind: resource.KindApplication, Name: "api"}] = "app-uuid"
 	changes := []plan.Change{
+		{Op: plan.OpUpdate, Path: "Application.api.description", New: "core API"},
 		{Op: plan.OpUpdate, Path: "Application.api.fqdn", New: "https://new.example.com"},
 		{Op: plan.OpUpdate, Path: "Application.api.image.tag", New: "v2"},
 	}
@@ -210,8 +211,8 @@ func TestApplyUpdateMapsChangedFields(t *testing.T) {
 		t.Fatalf("want UpdateApplication app-uuid, got %+v", mc.calls[0])
 	}
 	upd := mc.calls[0].updReq
-	if upd.Domains != "https://new.example.com" || upd.DockerRegistryImageTag != "v2" {
-		t.Errorf("patch body = %+v, want fqdn+tag mapped", upd)
+	if upd.Description != "core API" || upd.Domains != "https://new.example.com" || upd.DockerRegistryImageTag != "v2" {
+		t.Errorf("patch body = %+v, want description+fqdn+tag mapped", upd)
 	}
 	if upd.PortsExposes != "" {
 		t.Errorf("unchanged port must be omitted from patch, got %q", upd.PortsExposes)

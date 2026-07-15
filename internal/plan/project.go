@@ -15,6 +15,7 @@ import (
 // they are wired into the projection once envs are fetched by an apply command.
 func FromApplication(app resource.Application) Resource {
 	fields := []Field{
+		{Name: "description", Value: Scalar(app.Spec.Description)},
 		{Name: "fqdn", Value: Scalar(app.Spec.FQDN)},
 		{Name: "port", Value: Scalar(strconv.Itoa(app.Spec.Port))},
 	}
@@ -34,6 +35,7 @@ func FromApplication(app resource.Application) Resource {
 // report a phantom move on every plan.
 func FromRemoteApplication(app coolify.Application) Resource {
 	fields := []Field{
+		{Name: "description", Value: Scalar(app.Description)},
 		{Name: "fqdn", Value: Scalar(app.FQDN)},
 		{Name: "port", Value: Scalar(app.PortsExposes)},
 		{Name: "image.name", Value: Scalar(app.DockerRegistryImageName)},
@@ -67,6 +69,7 @@ const coolifyDefaultCPUShares = 1024
 // compared only when meaningfully set (see FromRemoteDatabase).
 func FromDatabase(d resource.Database) Resource {
 	fields := []Field{
+		{Name: "description", Value: Scalar(d.Spec.Description)},
 		{Name: "image", Value: Scalar(d.Spec.Image)},
 		{Name: "public", Value: Scalar(strconv.FormatBool(d.Spec.Public))},
 	}
@@ -87,6 +90,7 @@ func FromDatabase(d resource.Database) Resource {
 // runtime-assigned port against an undeclared one would report a phantom change.
 func FromRemoteDatabase(d coolify.Database) Resource {
 	fields := []Field{
+		{Name: "description", Value: Scalar(d.Description)},
 		{Name: "image", Value: Scalar(d.Image)},
 		{Name: "public", Value: Scalar(strconv.FormatBool(d.IsPublic))},
 	}

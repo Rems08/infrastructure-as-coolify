@@ -25,7 +25,7 @@ jobs:
         run: gofmt -d . | tee /tmp/fmt-diff && test ! -s /tmp/fmt-diff
       - name: go vet
         run: go vet ./...
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
 

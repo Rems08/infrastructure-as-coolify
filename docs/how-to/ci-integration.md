@@ -2,9 +2,9 @@
 
 Pass `COOLIFY_API_TOKEN` (and any Cloudflare Access service-token headers) as **masked** CI
 secrets, and set `IAC_COOLIFY_ACTOR` so the audit log attributes the change. When you use
-SOPS, store the age private key as a masked secret and write it to an owner-only file pointed
-at by `SOPS_AGE_KEY_FILE`. Run `plan` on pull/merge requests and `apply --auto-approve` on the
-protected default branch.
+SOPS, store the age private key as a masked secret (`SOPS_AGE_KEY`) and write it to an
+owner-only file pointed at by `SOPS_AGE_KEY_FILE`. Run `plan` on pull/merge requests and
+`apply --auto-approve` on the protected default branch.
 
 ## GitHub Actions
 
@@ -122,3 +122,11 @@ apply:production:
 
 Scope further with `--target <name>` to pilot a single application before managing the whole
 topology, e.g. `IAC_COOLIFY_ARGS: "--env production --target restaurant-core-api"`.
+
+## Without the action or template
+
+For a runner that cannot use the composite action or the GitLab template — or to pin the
+binary via `go install` — start from the raw reference workflows:
+[`examples/ci/github-actions.yml`](https://github.com/Rems08/infrastructure-as-coolify/blob/main/examples/ci/github-actions.yml)
+and
+[`examples/ci/gitlab-ci.yml`](https://github.com/Rems08/infrastructure-as-coolify/blob/main/examples/ci/gitlab-ci.yml).

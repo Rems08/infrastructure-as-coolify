@@ -26,15 +26,17 @@ iac-coolify apply infra/ --env staging --auto-approve
 # Restrict to one database by logical name
 iac-coolify apply infra/ --target pg-core --auto-approve
 
-# Delete databases (reverse dependency order)
+# Delete databases (reverse dependency order; a full teardown of configs, volumes and networks)
 iac-coolify destroy infra/ --env staging --auto-approve
 ```
 
 The `password` is an opaque `Secret`: it is mapped to the engine-specific credential field
 (`postgres_password`, `redis_password`, `mysql_password`, …) and revealed only at the HTTP
 boundary, never in plan/apply output, errors or the audit log. The `apply` diff compares
-`image`, `public`/`public_port` and CPU/memory limits; a credential never field-diffs, so
-rotating a password is an explicit future operation rather than reconciled drift.
+`image`, `public`/`public_port`, the `destination` pair and CPU/memory limits; a credential
+never field-diffs, so rotating a password is an explicit future operation rather than
+reconciled drift. A `destination` change is a recreate, not an update — see
+[Move a resource to another server](move-resource.md).
 
 > **MongoDB passwords on create:** the pinned Coolify v4 spec exposes no password field on
 > the MongoDB create endpoint (only `mongo_initdb_root_username`), so a MongoDB `password`

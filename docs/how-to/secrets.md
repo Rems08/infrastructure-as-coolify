@@ -45,7 +45,10 @@ longer reports an unset secret environment variable; run `apply` to surface a mi
 A `${sops:path}` reference is read from a `secrets.enc.yaml` **colocated with the manifest**
 (the path is never user-supplied, so there is no traversal surface), decrypted in memory, and
 shown as `[REDACTED]`. `path` is a dotted key into the decrypted document, e.g.
-`databases.staging.password`.
+`databases.staging.password`. A worked example lives in
+[`examples/secrets-sops/`](https://github.com/Rems08/infrastructure-as-coolify/tree/main/examples/secrets-sops)
+— its committed `secrets.enc.yaml` is encrypted to a throwaway recipient, so re-encrypt it
+with your own key before running it.
 
 ```sh
 # 1. Generate an age key and restrict it (iac-coolify refuses a group/other-readable key).
@@ -61,7 +64,8 @@ iac-coolify validate coolify.yaml
 
 `iac-coolify` locates the key via `SOPS_AGE_KEY_FILE` (or the default
 `~/.config/sops/age/keys.txt`). **Never commit a private age key** — only the encrypted file
-and the public recipient (`.sops.yaml`) are safe to track.
+and the public recipient (`.sops.yaml`) are safe to track. Add a pattern such as `*.age.key`
+to your `.gitignore` so a key exported next to the manifests can never be committed.
 
 ## Viewing secret values
 

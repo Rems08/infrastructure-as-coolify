@@ -89,6 +89,41 @@ docker_signs:
     artifacts: all
     output: true
 
+# The cask lives in this same repository under Casks/, published through a
+# pull request rather than a direct push so the update only lands on main
+# once CI has passed. CASK_PR_TOKEN must be a personal access token: pull
+# requests opened with the default Actions token never trigger workflows,
+# so CI would not run and the auto-merge would wait forever.
+homebrew_casks:
+  - name: iac-coolify
+    directory: Casks
+    description: Declarative Infrastructure as Code for Coolify
+    homepage: https://github.com/Rems08/infrastructure-as-coolify
+    # Prereleases never touch the cask, mirroring release.prerelease: auto.
+    skip_upload: auto
+    commit_msg_template: "chore(release): update iac-coolify cask to {{ .Tag }}"
+    repository:
+      owner: Rems08
+      name: infrastructure-as-coolify
+      # One branch per version so a stale PR from a failed release can never
+      # collide with the next release's push.
+      branch: "cask-update-{{ .Version }}"
+      token: "{{ .Env.CASK_PR_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: Rems08
+          name: infrastructure-as-coolify
+          branch: main
+    # The binaries are cosign-signed but not Apple-notarized, so Gatekeeper
+    # quarantines them on first run; drop the attribute after install.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/iac-coolify"]
+          end
+
 release:
   github:
     owner: Rems08

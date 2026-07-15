@@ -46,6 +46,9 @@ A Service is a docker-compose stack. It sources its definition from exactly one 
 resolve outside the config tree) or a `type` (a Coolify one-click template identifier such as
 `gitea-with-mysql`).
 
+> **Service domains:** Coolify binds domains per docker-compose sub-service, so a Service's
+> `fqdn` is advisory metadata for now and is not applied on create.
+
 ## Validation at the boundary
 
 Configuration is validated where it is parsed, not where it is used: `validate` checks YAML

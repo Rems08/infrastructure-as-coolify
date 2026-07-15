@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- Homebrew cask: `brew tap rems08/iac-coolify https://github.com/Rems08/infrastructure-as-coolify`
+  then `brew install --cask iac-coolify`. The cask lives in this repository under `Casks/`
+  and is updated on every stable release through an auto-merged pull request, gated on CI.
+
 - `plan` now diffs `destination.server` and `destination.network` for applications and
   databases, projecting the server's logical name (never its UUID). A destination change is
   rendered as `-/+ <Kind>.<name> must be recreated (destination changed: …)` in text and

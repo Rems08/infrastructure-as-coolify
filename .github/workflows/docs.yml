@@ -15,7 +15,7 @@ permissions:
 
 # Same toolchain as the Makefile pin.
 env:
-  GOTOOLCHAIN: go1.25.11
+  GOTOOLCHAIN: go1.25.12
 
 # Serialize deploys so a newer run never races an older one onto Pages.
 concurrency:

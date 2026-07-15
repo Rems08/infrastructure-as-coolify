@@ -53,6 +53,11 @@ Environment name such as staging or production.
 
 ## DatabaseSpec
 
+### description
+
+Human-readable database description.
+
+
 ### engine
 
 Database engine.

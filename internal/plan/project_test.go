@@ -25,8 +25,8 @@ func TestProjectorsRoundTrip(t *testing.T) {
 	if desired.Kind != resource.KindApplication || desired.Name != "web" {
 		t.Fatalf("projected resource = %+v", desired)
 	}
-	if len(desired.Fields) != 6 {
-		t.Errorf("want 6 fields (fqdn, port, image.name, image.tag, destination.server, destination.network), got %d", len(desired.Fields))
+	if len(desired.Fields) != 7 {
+		t.Errorf("want 7 fields (description, fqdn, port, image.name, image.tag, destination.server, destination.network), got %d", len(desired.Fields))
 	}
 
 	// Same values remotely → no changes.
@@ -43,10 +43,18 @@ func TestProjectorsRoundTrip(t *testing.T) {
 	}
 
 	// A drifted remote FQDN must surface.
-	remote.Fields[0] = plan.Field{Name: "fqdn", Value: plan.Scalar("https://stale.example.com")}
+	remote.Fields[1] = plan.Field{Name: "fqdn", Value: plan.Scalar("https://stale.example.com")}
 	changes := plan.Diff(desired, &remote)
 	if len(changes) != 1 || changes[0].Op != plan.OpUpdate || changes[0].Path != "Application.web.fqdn" {
 		t.Errorf("drift diff = %+v", changes)
+	}
+
+	// A drifted description must surface as an ordinary update, not a recreate.
+	remote.Fields[1] = plan.Field{Name: "fqdn", Value: plan.Scalar("https://web.example.com")}
+	remote.Fields[0] = plan.Field{Name: "description", Value: plan.Scalar("stale role")}
+	changes = plan.Diff(desired, &remote)
+	if len(changes) != 1 || changes[0].Path != "Application.web.description" || changes[0].RequiresRecreate {
+		t.Errorf("description drift diff = %+v", changes)
 	}
 }
 
@@ -56,8 +64,8 @@ func TestFromApplicationNoImage(t *testing.T) {
 		Spec:     resource.ApplicationSpec{FQDN: "https://svc", Port: 80},
 	}
 	desired := plan.FromApplication(app)
-	if len(desired.Fields) != 4 {
-		t.Errorf("no-image app should project 4 fields (fqdn, port, destination pair), got %d", len(desired.Fields))
+	if len(desired.Fields) != 5 {
+		t.Errorf("no-image app should project 5 fields (description, fqdn, port, destination pair), got %d", len(desired.Fields))
 	}
 }
 

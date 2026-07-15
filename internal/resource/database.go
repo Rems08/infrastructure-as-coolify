@@ -41,6 +41,7 @@ type DatabaseMeta struct {
 
 // DatabaseSpec is the desired state of a database.
 type DatabaseSpec struct {
+	Description string         `yaml:"description,omitempty" json:"description,omitempty" iac:"doc=Human-readable database description"`
 	Engine      string         `yaml:"engine" json:"engine" iac:"doc=Database engine,required,enum=postgresql|mysql|mariadb|mongodb|redis|keydb|dragonfly|clickhouse"`
 	Version     string         `yaml:"version,omitempty" json:"version,omitempty" iac:"doc=Engine version used as the image tag such as 16"`
 	Image       string         `yaml:"image,omitempty" json:"image,omitempty" iac:"doc=Custom Docker image overriding the default engine image"`

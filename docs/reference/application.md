@@ -53,6 +53,11 @@ Environment name such as staging or production.
 
 ## ApplicationSpec
 
+### description
+
+Human-readable application description.
+
+
 ### build_pack
 
 Build pack to use.

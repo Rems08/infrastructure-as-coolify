@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- Application and Database specs accept an optional `description`. `plan` diffs it as an
+  ordinary update (never a recreate), `apply` sends it on create and update, and `import`
+  captures the live description into the manifest.
+
 ## [0.1.5] - 2026-07-15
 
 ### Added

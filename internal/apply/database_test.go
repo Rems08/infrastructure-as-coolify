@@ -69,6 +69,7 @@ func TestApplyDatabaseUpdateMapsChangedFields(t *testing.T) {
 	resolved := projectResolved()
 	resolved[state.ResourceKey{Kind: resource.KindDatabase, Name: "cache"}] = "db-uuid"
 	changes := []plan.Change{
+		{Op: plan.OpUpdate, Path: "Database.cache.description", New: "session cache"},
 		{Op: plan.OpUpdate, Path: "Database.cache.image", New: "redis:8-alpine"},
 		{Op: plan.OpUpdate, Path: "Database.cache.limits.memory", New: "512m"},
 	}
@@ -80,8 +81,8 @@ func TestApplyDatabaseUpdateMapsChangedFields(t *testing.T) {
 		t.Fatalf("want UpdateDatabase db-uuid, got %+v", mc.calls[0])
 	}
 	upd := mc.calls[0].dbUpdReq
-	if upd.Image != "redis:8-alpine" || upd.LimitsMemory != "512m" {
-		t.Errorf("patch body = %+v, want image+memory mapped", upd)
+	if upd.Description != "session cache" || upd.Image != "redis:8-alpine" || upd.LimitsMemory != "512m" {
+		t.Errorf("patch body = %+v, want description+image+memory mapped", upd)
 	}
 	// An unchanged public flag must be omitted (nil pointer), not sent as false.
 	if upd.IsPublic != nil {

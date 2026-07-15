@@ -303,6 +303,7 @@ func (e *Engine) applicationCreateRequest(op Operation) (coolify.CreateApplicati
 		ServerUUID:      srvUUID,
 		EnvironmentName: app.Metadata.Environment,
 		Name:            app.Metadata.Name,
+		Description:     app.Spec.Description,
 		Domains:         app.Spec.FQDN,
 		Dockerfile:      app.Spec.Dockerfile,
 	}
@@ -330,6 +331,8 @@ func updateRequestFromChanges(op Operation) coolify.UpdateApplicationRequest {
 	var req coolify.UpdateApplicationRequest
 	for _, c := range op.Changes {
 		switch strings.TrimPrefix(c.Path, prefix) {
+		case "description":
+			req.Description = c.New
 		case "fqdn":
 			req.Domains = c.New
 		case "port":
@@ -359,6 +362,7 @@ func (e *Engine) databaseCommon(db resource.Database) (coolify.CreateDatabaseCom
 		ProjectUUID:     projUUID,
 		EnvironmentName: db.Metadata.Environment,
 		Name:            db.Metadata.Name,
+		Description:     db.Spec.Description,
 		Image:           db.Spec.Image,
 		IsPublic:        db.Spec.Public,
 		PublicPort:      db.Spec.PublicPort,
@@ -408,6 +412,8 @@ func updateDatabaseRequestFromChanges(op Operation) coolify.UpdateDatabaseReques
 	var req coolify.UpdateDatabaseRequest
 	for _, c := range op.Changes {
 		switch strings.TrimPrefix(c.Path, prefix) {
+		case "description":
+			req.Description = c.New
 		case "image":
 			req.Image = c.New
 		case "public":

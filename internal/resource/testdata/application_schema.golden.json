@@ -49,6 +49,9 @@
     },
     "ApplicationSpec": {
       "properties": {
+        "description": {
+          "type": "string"
+        },
         "build_pack": {
           "type": "string"
         },

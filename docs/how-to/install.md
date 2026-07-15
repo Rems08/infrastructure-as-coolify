@@ -10,6 +10,7 @@ automatically on every stable release:
 
 ```sh
 brew tap rems08/iac-coolify https://github.com/Rems08/infrastructure-as-coolify
+brew trust rems08/iac-coolify    # recent Homebrew requires trusting third-party taps
 brew install --cask iac-coolify
 iac-coolify version
 ```
